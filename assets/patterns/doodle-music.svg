@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#685B53" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Eighth note -->
+  <circle cx="28" cy="38" r="4" fill="#685B53" />
+  <path d="M 32 38 L 32 20 C 32 20 40 20 40 28" />
+  <!-- Double note -->
+  <circle cx="78" cy="88" r="4" fill="#685B53" />
+  <circle cx="98" cy="84" r="4" fill="#685B53" />
+  <path d="M 82 88 L 82 66 L 102 62 L 102 84" />
+  <path d="M 82 72 L 102 68" />
+  <!-- Soundwaves / sparkles -->
+  <path d="M 85 24 Q 92 28 85 34" opacity="0.6" />
+  <path d="M 89 20 Q 98 28 89 38" opacity="0.4" />
+  <!-- Sparkles -->
+  <path d="M 28 85 L 28 93 M 24 89 L 32 89" opacity="0.6" />
+  <circle cx="58" cy="55" r="1.5" fill="#685B53" stroke="none" opacity="0.4" />
+</svg>

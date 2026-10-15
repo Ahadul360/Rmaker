@@ -1,0 +1,400 @@
+/**
+ * ReelMaker Stylesheet - Responsive Layout & Mobile Optimizations
+ */
+
+/* ==========================================================================
+   1. Tablet & Medium Screens (max-width: 1024px)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  :root {
+    --panel-width: 280px;
+    --timeline-height: 310px;
+  }
+
+  .project-title-input {
+    width: 130px;
+  }
+  .project-title-input:focus {
+    width: 160px;
+  }
+
+  .timeline-track-headers {
+    width: 105px;
+    padding-bottom: 20px;
+  }
+  .track-header span {
+    font-size: 10px;
+  }
+}
+
+/* ==========================================================================
+   2. Mobile Phones (max-width: 768px)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  :root {
+    --header-height: 48px;
+    --sidebar-width: 0px;
+    --timeline-height: 270px;
+  }
+
+  /* Compact Top Header */
+  .app-header {
+    padding: 0 10px;
+  }
+  .brand-name {
+    display: none;
+  }
+  .save-badge, .offline-badge {
+    display: none;
+  }
+  .project-title-input {
+    width: 110px;
+    font-size: 12px;
+  }
+
+  /* Workspace Layout Shift for Mobile */
+  .app-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Center Canvas Viewport - Top prominent area in mobile */
+  .canvas-viewport-wrapper {
+    order: 1;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 10;
+    transition: all var(--transition-normal);
+  }
+
+  /* When menu details drawer is open, keep canvas visible and nicely fitted in upper viewport */
+  .app-workspace.drawer-open .canvas-viewport-wrapper,
+  #app-container.drawer-open .canvas-viewport-wrapper {
+    height: calc(100vh - var(--header-height) - 46vh);
+    height: calc(100dvh - var(--header-height) - 46dvh);
+    max-height: calc(100vh - var(--header-height) - 46vh);
+    max-height: calc(100dvh - var(--header-height) - 46dvh);
+    flex: 0 0 calc(100dvh - var(--header-height) - 46dvh);
+    padding: 6px 10px;
+  }
+
+  .canvas-viewport {
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    transition: none !important; /* avoid animated lag on mobile resize */
+  }
+
+  #preview-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .viewport-floating-bar {
+    top: 8px;
+    padding: 3px 8px;
+  }
+  .viewport-floating-bar .btn-tool {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* Mobile Horizontal Tool Navigation Bar - Docked below canvas */
+  .app-sidebar {
+    order: 2;
+    width: 100%;
+    height: 48px;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 4px;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    border-right: none;
+    flex-shrink: 0;
+    z-index: 50;
+    position: relative;
+  }
+
+  .sidebar-nav-btn {
+    width: 44px;
+    height: 40px;
+    font-size: 8.5px;
+    gap: 1px;
+    border-radius: var(--radius-sm);
+  }
+  .sidebar-nav-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Tool Panel Drawer Backdrop - Transparent to keep canvas crisp and visible */
+  .drawer-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: 90;
+    pointer-events: none;
+  }
+  .drawer-backdrop.mobile-open {
+    display: block;
+    pointer-events: auto;
+  }
+
+  .drawer-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px 8px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    cursor: pointer;
+  }
+
+  .drawer-drag-pill {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-color);
+  }
+
+  .drawer-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .drawer-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 8px;
+  }
+
+  /* Tool Panel Drawer - Bottom 48% height sheet with rich touch scrolling */
+  .app-tool-panels {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 48vh;
+    height: 48dvh;
+    max-height: 420px;
+    background-color: var(--bg-secondary);
+    border-top: 2px solid var(--accent);
+    border-right: none;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    transform: translateY(115%);
+    transition: transform var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .app-tool-panels.mobile-open {
+    transform: translateY(0);
+  }
+
+  /* Tool Panel Tab container */
+  .tool-panel-tab {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+  }
+  .tool-panel-tab.active {
+    display: flex;
+  }
+
+  #panel-text-content,
+  #panel-bg-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Menu Details View: Generous bottom padding for comfortable mobile scrolling */
+  .panel-body {
+    padding: 14px 16px 110px !important;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Bigger, touch-friendly Timeline for Mobile with Bottom Padding */
+  #timeline-container {
+    height: var(--timeline-height);
+    flex-shrink: 0;
+    padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
+    box-sizing: border-box;
+  }
+
+  .timeline-header-bar {
+    height: 42px;
+    padding: 0 10px;
+  }
+  .timeline-track-headers {
+    width: 90px;
+    padding-bottom: 0;
+  }
+  .timeline-headers-content {
+    padding-bottom: 56px;
+  }
+  .track-header {
+    height: 32px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+  .track-header.ruler-header {
+    height: 24px;
+    font-size: 9.5px;
+    position: sticky;
+    top: 0;
+    z-index: 15;
+  }
+  .timeline-track-row {
+    height: 32px;
+  }
+  .timeline-ruler {
+    height: 24px;
+    position: sticky;
+    top: 0;
+    z-index: 15;
+  }
+  .audio-waveform-canvas {
+    height: 32px;
+  }
+  .timeline-track-headers .track-header:last-child {
+    margin-bottom: 56px;
+  }
+  .timeline-tracks-content {
+    padding-bottom: 56px;
+  }
+  .timeline-tracks-content .timeline-track-row:last-child {
+    margin-bottom: 56px;
+  }
+  .timeline-scroll-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .timeline-scroll-container::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .timeline-track-headers {
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .timeline-timecode {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  .timeline-duration-field label {
+    display: none;
+  }
+  .timeline-duration-field input {
+    width: 42px;
+    font-size: 11px;
+  }
+
+  /* Touch-friendly Tap Targets */
+  .btn-play-pause {
+    width: 30px;
+    height: 30px;
+  }
+
+  .btn-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .emoji-picker-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .templates-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Modals on Mobile */
+  .modal-card {
+    max-width: 95vw;
+    margin: 10px;
+  }
+
+  /* Toast Notifications: Move to top on mobile to keep timeline clean */
+  .toast-container {
+    top: 58px;
+    bottom: auto;
+    left: 16px;
+    right: 16px;
+    align-items: center;
+  }
+  .toast {
+    max-width: 92vw;
+    width: auto;
+    font-size: 12px;
+    padding: 8px 14px;
+  }
+}
+
+/* ==========================================================================
+   3. Reduced Motion & High Contrast Media Queries
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

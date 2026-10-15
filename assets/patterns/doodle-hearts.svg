@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#685B53" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Hand-drawn style hearts & sparkle doodles -->
+  <path d="M 28 24 C 28 17 38 12 43 20 C 48 12 58 17 58 24 C 58 35 43 45 43 45 C 43 45 28 35 28 24 Z" opacity="0.75" />
+  <path d="M 85 75 C 85 70 92 67 96 72 C 100 67 107 70 107 75 C 107 83 96 90 96 90 C 96 90 85 83 85 75 Z" opacity="0.6" />
+  <!-- Sparkles / stars -->
+  <path d="M 90 20 L 90 32 M 84 26 L 96 26" opacity="0.7" />
+  <path d="M 20 85 L 20 95 M 15 90 L 25 90" opacity="0.6" />
+  <!-- Mini decorative dots & arcs -->
+  <circle cx="68" cy="18" r="1.5" fill="#685B53" stroke="none" opacity="0.5" />
+  <circle cx="55" cy="85" r="1.5" fill="#685B53" stroke="none" opacity="0.5" />
+  <path d="M 68 58 Q 74 54 80 58" opacity="0.5" />
+  <path d="M 12 45 Q 16 40 22 43" opacity="0.5" />
+</svg>

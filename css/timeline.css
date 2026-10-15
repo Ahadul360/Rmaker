@@ -1,0 +1,364 @@
+/**
+ * ReelMaker Stylesheet - Multitrack Timeline Component
+ */
+
+/* ==========================================================================
+   1. Timeline Root Container & Header Bar
+   ========================================================================== */
+
+#timeline-container {
+  height: var(--timeline-height);
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 80;
+  user-select: none;
+  padding-bottom: 18px;
+  box-sizing: border-box;
+}
+
+.timeline-header-bar {
+  height: 48px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.timeline-controls-left, .timeline-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Play / Pause Primary Button */
+.btn-play-pause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #FFFFFF;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--accent-glow);
+  transition: all var(--transition-fast);
+}
+.btn-play-pause:hover {
+  background: var(--accent-hover);
+  transform: scale(1.08);
+}
+.btn-play-pause:active {
+  transform: scale(0.96);
+}
+
+/* Timecode Display */
+.timeline-timecode {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+.tc-separator {
+  color: var(--text-muted);
+}
+#tc-total {
+  color: var(--text-secondary);
+}
+
+/* Duration Field */
+.timeline-duration-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.timeline-duration-field input {
+  width: 52px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  color: var(--text-primary);
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.timeline-zoom-controls {
+  display: flex;
+  gap: 4px;
+}
+
+/* ==========================================================================
+   2. Timeline Body: Headers & Tracks Scroll Area
+   ========================================================================== */
+
+.timeline-body-wrapper {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Column: Fixed Track Headers */
+.timeline-track-headers {
+  width: 125px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  z-index: 10;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.timeline-track-headers::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.timeline-headers-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 72px;
+}
+
+.track-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+.track-header.ruler-header {
+  height: 28px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+.track-header.audio-header {
+  color: #38EF7D;
+}
+
+/* Right Column: Scrollable Tracks Area */
+.timeline-scroll-container {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  position: relative;
+  background-color: #14171E;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.timeline-tracks-content {
+  position: relative;
+  min-width: 100%;
+  padding-bottom: 72px;
+}
+
+/* Time Ruler */
+.timeline-ruler {
+  height: 28px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  cursor: pointer;
+}
+
+.ruler-ticks {
+  position: absolute;
+  inset: 0;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border-color);
+}
+.tick-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.timeline-track-headers .track-header:last-child {
+  margin-bottom: 70px;
+}
+
+/* Track Rows */
+.timeline-track-row {
+  height: 40px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  background: rgba(255, 255, 255, 0.01);
+}
+.timeline-track-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+.timeline-tracks-content .timeline-track-row:last-child {
+  margin-bottom: 70px;
+}
+
+/* Track Audio with Waveform */
+.timeline-track-row.audio-track {
+  position: relative;
+  overflow: hidden;
+}
+.audio-waveform-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 40px;
+  pointer-events: none;
+  z-index: 1;
+}
+.audio-track-block {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  background: rgba(56, 239, 125, 0.18);
+  border: 1px solid rgba(56, 239, 125, 0.5);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  z-index: 2;
+  pointer-events: none;
+}
+.audio-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #38EF7D;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   3. Draggable Timeline Clip Blocks
+   ========================================================================== */
+
+.timeline-block {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  z-index: 5;
+  touch-action: none;
+}
+.timeline-block:hover {
+  border-color: #555D6E;
+  background: #282E3B;
+}
+.timeline-block.selected {
+  border-color: var(--accent);
+  background: rgba(139, 124, 255, 0.2);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.timeline-block:active {
+  cursor: grabbing;
+}
+
+.block-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  padding: 0 4px;
+}
+
+/* Trim Handles (Left and Right edges of clip) */
+.block-trim-handle {
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  border-radius: 2px;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+.block-trim-handle:hover {
+  background: var(--accent);
+}
+.trim-left { margin-left: -4px; }
+.trim-right { margin-right: -4px; }
+
+/* ==========================================================================
+   4. Playhead Scrubber (Red / Accent Line & Cap)
+   ========================================================================== */
+
+.timeline-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background-color: var(--accent);
+  pointer-events: none;
+  z-index: 50;
+  will-change: transform;
+}
+
+.playhead-cap {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 14px;
+  height: 14px;
+  background-color: var(--accent);
+  clip-path: polygon(0% 0%, 100% 0%, 100% 60%, 50% 100%, 0% 60%);
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.playhead-line {
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}

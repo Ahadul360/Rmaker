@@ -1,0 +1,707 @@
+/**
+ * ReelMaker Stylesheet - Main Editor Layout & Panels
+ */
+
+/* ==========================================================================
+   1. Root Application Shell Layout
+   ========================================================================== */
+
+#app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+/* ==========================================================================
+   2. Top Application Header / Toolbar
+   ========================================================================== */
+
+.app-header {
+  height: var(--header-height);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.header-left, .header-center, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Brand Logo */
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  text-decoration: none;
+  margin-right: 6px;
+}
+.brand-logo-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+.brand-name span {
+  color: var(--accent);
+}
+
+/* Project Title Input */
+.project-title-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.project-title-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  width: 180px;
+  transition: all var(--transition-fast);
+}
+.project-title-input:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+.project-title-input:focus {
+  background: var(--bg-input);
+  border-color: var(--accent);
+  width: 220px;
+}
+
+/* Status Badges */
+.save-badge, .offline-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.dot-green { background-color: var(--success); box-shadow: 0 0 6px rgba(46, 213, 115, 0.5); }
+.dot-yellow { background-color: var(--warning); box-shadow: 0 0 6px rgba(255, 165, 2, 0.5); }
+.dot-gray { background-color: var(--text-muted); }
+.dot-orange { background-color: #FF7F50; }
+
+/* Aspect Ratio Pills */
+.ratio-selector-group {
+  display: flex;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 2px;
+}
+.ratio-pill {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.ratio-pill:hover {
+  color: var(--text-primary);
+}
+.ratio-pill.active {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* Header Separator */
+.header-sep {
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color);
+}
+
+/* ==========================================================================
+   3. Workspace Main Body (Sidebar + Viewport + Inspector)
+   ========================================================================== */
+
+.app-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left Sidebar Icon Navigation */
+.app-sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.sidebar-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 54px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.sidebar-nav-btn svg {
+  width: 20px;
+  height: 20px;
+  transition: transform var(--transition-fast);
+}
+.sidebar-nav-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+.sidebar-nav-btn:hover svg {
+  transform: translateY(-1px);
+}
+.sidebar-nav-btn.active {
+  color: var(--accent);
+  background: rgba(139, 124, 255, 0.12);
+  border: 1px solid rgba(139, 124, 255, 0.25);
+}
+
+/* Left Tool Panels (Drawers) */
+.drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 105;
+}
+
+.drawer-mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 8px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.drawer-drag-pill {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-color);
+}
+
+.drawer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+}
+.drawer-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.app-tool-panels {
+  width: var(--panel-width);
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tool-panel-tab {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.tool-panel-tab.active {
+  display: flex;
+}
+
+#panel-text-content,
+#panel-bg-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  flex-shrink: 0;
+}
+.panel-section-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.panel-body {
+  padding: 16px 18px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ==========================================================================
+   4. Center Canvas Viewport
+   ========================================================================== */
+
+.canvas-viewport-wrapper {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  position: relative;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.canvas-viewport {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #0E1015;
+  flex-shrink: 0;
+  transition: width 150ms ease, height 150ms ease;
+}
+
+#preview-canvas {
+  display: block;
+  border-radius: 10px;
+  cursor: crosshair;
+  touch-action: none; /* Prevents gesture bounce/scroll on touch drag */
+}
+
+/* Floating Viewport Overlay Bar */
+.viewport-floating-bar {
+  position: absolute;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(26, 29, 36, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  z-index: 20;
+}
+.viewport-floating-bar .btn-tool {
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+.viewport-floating-bar .btn-tool.active {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   5. Element Pickers & Grids (Emojis, Shapes, Swatches)
+   ========================================================================== */
+
+/* Emoji Grid */
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.emoji-picker-btn {
+  font-size: 26px;
+  padding: 8px 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.emoji-picker-btn:hover {
+  transform: scale(1.18);
+  background: rgba(139, 124, 255, 0.15);
+  border-color: var(--accent);
+}
+
+/* Shapes Grid */
+.shapes-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.shape-picker-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+.shape-picker-btn:hover {
+  border-color: var(--accent);
+  background: rgba(139, 124, 255, 0.12);
+  transform: translateY(-2px);
+}
+.shape-icon {
+  font-size: 24px;
+  color: var(--accent);
+}
+.shape-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Preset Background Swatches */
+.preset-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.bg-swatch-card {
+  height: 54px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 4px 6px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+.bg-swatch-card:hover {
+  transform: scale(1.05);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.swatch-label {
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  padding: 1px 4px;
+  border-radius: 3px;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* File Drop Zone */
+.file-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+.file-drop-zone:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(139, 124, 255, 0.08);
+}
+
+/* Template Cards Grid */
+.templates-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.template-card {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.template-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.template-preview-badge {
+  width: 64px;
+  height: 90px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.preview-emoji {
+  font-size: 28px;
+}
+.template-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+}
+.template-info h5 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.template-info p {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+.template-badge {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+/* Project Item Rows in Project Modal */
+.projects-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.project-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+.project-item-row.active-project {
+  border-color: var(--accent);
+  background: rgba(139, 124, 255, 0.08);
+}
+.project-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.project-row-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.project-row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.project-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   6. Video Export Modal Styling
+   ========================================================================== */
+
+.export-notes {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(139, 124, 255, 0.08);
+  border: 1px solid rgba(139, 124, 255, 0.2);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 14px;
+}
+.export-notes svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.export-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0 16px;
+  position: relative;
+}
+.spinner-ring {
+  width: 68px;
+  height: 68px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.progress-percent {
+  position: absolute;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #9E90FF);
+  transition: width 150ms linear;
+}
+
+.export-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.stat-label { color: var(--text-muted); }
+.stat-value { font-weight: 600; color: var(--text-primary); }
+
+.export-success-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 16px;
+  text-align: center;
+}
+.export-success-badge h4 {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.export-preview-wrapper {
+  display: flex;
+  justify-content: center;
+  background: #000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+#export-video-preview {
+  max-height: 280px;
+  width: auto;
+  border-radius: var(--radius-md);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

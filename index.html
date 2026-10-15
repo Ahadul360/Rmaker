@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';" />
+  <title>ReelMaker - Offline Reel Video Generator</title>
+  <meta name="description" content="Generate beautiful aesthetic quote & status reel videos offline with Bengali typography, custom music, and doodle backgrounds. Works 100% in browser." />
+  <meta name="theme-color" content="#111318" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon-192.svg" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg" />
+
+  <!-- Local Offline CSS Stylesheets -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/editor.css" />
+  <link rel="stylesheet" href="css/timeline.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+  <div id="app-container">
+    <!-- ================= Top Application Toolbar ================= -->
+    <header class="app-header" role="banner">
+      <div class="header-left">
+        <a href="#" class="app-brand" aria-label="ReelMaker Home">
+          <img src="assets/icons/icon-192.svg" alt="ReelMaker Logo" class="brand-logo-img" />
+          <span class="brand-name">Reel<span>Maker</span></span>
+        </a>
+
+        <div class="project-title-wrapper">
+          <input type="text" id="input-project-title" class="project-title-input" value="আমার প্রথম রিল" title="Rename Project" aria-label="Project Title" />
+        </div>
+
+        <div class="save-badge" id="save-status-badge">
+          <span class="status-dot dot-green"></span> Saved
+        </div>
+      </div>
+
+      <div class="header-center">
+        <!-- Undo / Redo -->
+        <div class="btn-group">
+          <button id="btn-undo" class="btn-tool" title="Undo (Ctrl+Z)" disabled aria-label="Undo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+          </button>
+          <button id="btn-redo" class="btn-tool" title="Redo (Ctrl+Shift+Z)" disabled aria-label="Redo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+          </button>
+        </div>
+
+        <div class="header-sep"></div>
+
+        <!-- Aspect Ratio Switcher -->
+        <div class="ratio-selector-group" role="radiogroup" aria-label="Aspect Ratio">
+          <button class="ratio-pill active" data-ratio="9:16" title="TikTok / Reels (9:16)">9:16</button>
+          <button class="ratio-pill" data-ratio="1:1" title="Square Post (1:1)">1:1</button>
+          <button class="ratio-pill" data-ratio="4:5" title="Portrait Post (4:5)">4:5</button>
+        </div>
+
+        <div class="header-sep"></div>
+
+        <!-- Safe Area Toggle -->
+        <button id="btn-safe-area" class="btn-icon active" title="Toggle Reels Safe Area Guides" aria-label="Toggle Safe Area">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/><path d="M15 3v18"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+        </button>
+      </div>
+
+      <div class="header-right">
+        <div class="offline-badge" id="offline-indicator">
+          <span class="status-dot dot-green"></span> Offline Ready
+        </div>
+
+        <!-- Project Actions -->
+        <button id="btn-new" class="btn-icon" title="New Project" aria-label="New Project">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button id="btn-open" class="btn-icon" title="Saved Projects & Templates" aria-label="Open Projects">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button id="btn-save" class="btn btn-secondary btn-sm" title="Save Project (Ctrl+S)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Save</span>
+        </button>
+
+        <!-- Primary Export Action -->
+        <button id="btn-export" class="btn btn-primary btn-sm" title="Export Video File">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Export Video</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= Workspace Area ================= -->
+    <main class="app-workspace" role="main">
+      <!-- Left Sidebar Navigation -->
+      <nav class="app-sidebar" role="navigation" aria-label="Editing Tools">
+        <button class="sidebar-nav-btn active" data-tool="text" title="Text & Typography">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <span>Text</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="emoji" title="Emojis">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          <span>Emoji</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="background" title="Background & Patterns">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Backdrop</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="shapes" title="Stickers & Shapes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Shapes</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="handle" title="Social Branding Handle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+          <span>Handle</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="audio" title="Music & Audio Tracks">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span>Music</span>
+        </button>
+        <button class="sidebar-nav-btn" data-tool="templates" title="Pre-made Templates">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Templates</span>
+        </button>
+      </nav>
+
+      <!-- Left Tool Drawers / Panels -->
+      <div class="drawer-backdrop" id="tool-drawer-backdrop"></div>
+      <aside class="app-tool-panels" id="tool-panels-drawer" role="complementary">
+        <div class="drawer-mobile-header" id="drawer-mobile-header">
+          <div class="drawer-drag-pill"></div>
+          <span class="drawer-title" id="drawer-active-title">Editing Panel</span>
+          <button class="drawer-close-btn" id="btn-close-tool-drawer" aria-label="Close Panel">&times;</button>
+        </div>
+
+        <!-- 1. Text Panel -->
+        <section class="tool-panel-tab active" id="tab-text">
+          <div id="panel-text-content"></div>
+        </section>
+
+        <!-- 2. Emoji Panel -->
+        <section class="tool-panel-tab" id="tab-emoji">
+          <div class="panel-section-header">
+            <h4>Emoji Stickers</h4>
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label>Click an Emoji to Add to Reel:</label>
+              <div class="emoji-picker-grid" id="emoji-grid"></div>
+            </div>
+            <div class="form-group">
+              <label for="input-emoji-size">Selected Emoji Size:</label>
+              <input type="range" id="input-emoji-size" min="24" max="160" value="64" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Background Panel -->
+        <section class="tool-panel-tab" id="tab-background">
+          <div id="panel-bg-content"></div>
+        </section>
+
+        <!-- 4. Shapes Panel -->
+        <section class="tool-panel-tab" id="tab-shapes">
+          <div class="panel-section-header">
+            <h4>Decorations & Shapes</h4>
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label>Click a Decorative Element:</label>
+              <div class="shapes-picker-grid" id="shapes-grid"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="input-shape-color">Color:</label>
+                <input type="color" id="input-shape-color" value="#685B53" />
+              </div>
+              <div class="form-group flex-1">
+                <label for="input-shape-size">Size (px):</label>
+                <input type="range" id="input-shape-size" min="20" max="250" value="60" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Social Handle Panel -->
+        <section class="tool-panel-tab" id="tab-handle">
+          <div class="panel-section-header">
+            <h4>Creator Branding</h4>
+          </div>
+          <div class="panel-body">
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="check-handle-enable" checked />
+                <span>Show Creator Handle</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="input-handle-text">Handle Text:</label>
+              <input type="text" id="input-handle-text" class="form-input" value="@yourname" />
+            </div>
+            <div class="form-group">
+              <label for="select-handle-pos">Position Preset:</label>
+              <select id="select-handle-pos" class="form-select">
+                <option value="bottom-center" selected>Bottom Center</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right">Bottom Right</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="input-handle-color">Color:</label>
+                <input type="color" id="input-handle-color" value="#5A5049" />
+              </div>
+              <div class="form-group flex-1">
+                <label for="input-handle-size">Font Size:</label>
+                <input type="number" id="input-handle-size" class="form-input" min="16" max="44" value="26" />
+              </div>
+            </div>
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="check-handle-badge" checked />
+                <span>Translucent Pill Badge</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Music / Audio Panel -->
+        <section class="tool-panel-tab" id="tab-audio">
+          <div class="panel-section-header">
+            <h4>Audio & Music</h4>
+          </div>
+          <div class="panel-body">
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="check-audio-enable" checked />
+                <span>Enable Music in Video</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="select-bundled-audio">Bundled Royalty-Free Tracks:</label>
+              <select id="select-bundled-audio" class="form-select">
+                <option value="lofi-peace" selected>Lofi Peace (Chill & Calm)</option>
+                <option value="sad-acoustic">Sad Acoustic (Emotional)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="file-drop-zone">
+                <input type="file" id="input-audio-file" accept="audio/*" style="display:none;" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                <span>Import Local Audio File (MP3, WAV)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label for="input-audio-volume">Music Volume:</label>
+              <input type="range" id="input-audio-volume" min="0" max="1.0" step="0.05" value="0.85" />
+            </div>
+
+            <div class="form-group checkbox-group">
+              <label>
+                <input type="checkbox" id="check-audio-loop" checked />
+                <span>Loop Audio if Shorter than Reel</span>
+              </label>
+            </div>
+
+            <button class="btn btn-secondary btn-block" id="btn-preview-audio">
+              <span>▶ Preview Music</span>
+            </button>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Center Viewport with Interactive Canvas -->
+      <section class="canvas-viewport-wrapper" aria-label="Video Composition Preview">
+        <div class="canvas-viewport" id="canvas-viewport">
+          <canvas id="preview-canvas" width="1080" height="1920"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= Bottom Multitrack Timeline ================= -->
+    <footer id="timeline-container" role="contentinfo" aria-label="Video Multitrack Timeline">
+      <!-- Injected dynamically by timeline.js -->
+    </footer>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Main ES6 Application Orchestrator -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

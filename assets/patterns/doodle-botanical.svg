@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#685B53" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Small floral stem -->
+  <path d="M 30 50 Q 35 30 45 20" />
+  <path d="M 38 32 C 45 28 48 35 38 36 Z" fill="#685B53" fill-opacity="0.15" />
+  <path d="M 34 40 C 26 38 27 46 34 44 Z" fill="#685B53" fill-opacity="0.15" />
+  <!-- Daisy / mini flower -->
+  <circle cx="85" cy="75" r="3" fill="#685B53" />
+  <path d="M 85 66 L 85 71 M 85 79 L 85 84 M 76 75 L 81 75 M 89 75 L 94 75 M 78 68 L 82 72 M 88 78 L 92 82 M 78 82 L 82 78 M 88 72 L 92 68" opacity="0.75" />
+  <!-- Twig / vine -->
+  <path d="M 75 25 Q 90 28 95 38" opacity="0.6" />
+  <circle cx="95" cy="38" r="1.5" fill="#685B53" stroke="none" />
+  <circle cx="22" cy="85" r="1.5" fill="#685B53" stroke="none" opacity="0.5" />
+</svg>

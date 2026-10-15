@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#685B53" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 4-point star -->
+  <path d="M 30 18 Q 30 30 18 30 Q 30 30 30 42 Q 30 30 42 30 Q 30 30 30 18 Z" opacity="0.8" />
+  <!-- Crescent moon -->
+  <path d="M 88 20 C 82 24 82 34 88 38 C 84 38 78 32 80 22 C 81 21 85 20 88 20 Z" opacity="0.75" />
+  <!-- Sparkles -->
+  <path d="M 85 82 L 85 92 M 80 87 L 90 87" opacity="0.7" />
+  <path d="M 24 80 Q 24 88 16 88 Q 24 88 24 96 Q 24 88 32 88 Q 24 88 24 80 Z" opacity="0.65" />
+  <!-- Dots and constellation trails -->
+  <circle cx="58" cy="48" r="1.5" fill="#685B53" stroke="none" opacity="0.5" />
+  <circle cx="95" cy="55" r="1.2" fill="#685B53" stroke="none" opacity="0.4" />
+  <circle cx="62" cy="98" r="1.5" fill="#685B53" stroke="none" opacity="0.5" />
+</svg>
