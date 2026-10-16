@@ -93,12 +93,6 @@ The project strictly adheres to a modular, dependency-free architecture:
     patterns/           # SVG doodle patterns (hearts, stars, music, leaves)
     icons/              # High-resolution application and PWA icons
     music/              # Bundled royalty-free audio tracks (lofi-peace, sad-acoustic)
-
-  workers/
-    export-worker.js    # Off-thread Web Worker for audio analysis and validation
-
-  vendor/
-    README.md           # Third-party notices and license disclosures
 ```
 
 ---

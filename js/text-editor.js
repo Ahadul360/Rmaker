@@ -184,11 +184,7 @@ export class TextEditor {
         <div class="layer-actions-row">
           <button id="btn-duplicate-text" class="btn btn-secondary flex-1">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            <span>Duplicate</span>
-          </button>
-          <button id="btn-delete-text" class="btn btn-danger flex-1">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            <span>Delete</span>
+            <span>Duplicate Text Layer</span>
           </button>
         </div>
       </div>
@@ -312,7 +308,9 @@ export class TextEditor {
       btn.addEventListener('click', () => {
         alignBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        this.updateActiveElement({ textAlign: btn.dataset.align });
+        const align = btn.dataset.align;
+        this.inputText.style.textAlign = align;
+        this.updateActiveElement({ textAlign: align });
       });
     });
 
@@ -376,9 +374,11 @@ export class TextEditor {
       if (this.activeElement) State.duplicateElement(this.activeElement.id);
     });
 
-    this.btnDelete.addEventListener('click', () => {
-      if (this.activeElement) State.removeElement(this.activeElement.id);
-    });
+    if (this.btnDelete) {
+      this.btnDelete.addEventListener('click', () => {
+        if (this.activeElement) State.removeElement(this.activeElement.id);
+      });
+    }
 
     // React to selection changes
     State.on('selectionChange', (id) => this.loadSelectedElement(id));
@@ -433,9 +433,11 @@ export class TextEditor {
     this.btnItalic.classList.toggle('active', elem.fontStyle === 'italic');
 
     // Align buttons
+    const textAlign = elem.textAlign || 'center';
+    this.inputText.style.textAlign = textAlign;
     const alignBtns = this.container.querySelectorAll('#btn-group-align button');
     alignBtns.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.align === (elem.textAlign || 'center'));
+      btn.classList.toggle('active', btn.dataset.align === textAlign);
     });
 
     // Badge

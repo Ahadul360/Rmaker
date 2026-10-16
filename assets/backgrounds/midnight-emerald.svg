@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <linearGradient id="emeraldBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E281F" />
+      <stop offset="50%" stop-color="#091A14" />
+      <stop offset="100%" stop-color="#040C09" />
+    </linearGradient>
+    <radialGradient id="emeraldCenter" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1B4D3C" stop-opacity="0.28" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.6" />
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#emeraldBg)" />
+  <rect width="1080" height="1920" fill="url(#emeraldCenter)" />
+</svg>

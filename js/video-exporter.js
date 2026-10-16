@@ -41,6 +41,11 @@ export class VideoExporter {
           <!-- Configuration View -->
           <div class="modal-body" id="export-config-view">
             <div class="form-group">
+              <label>Export Format:</label>
+              <input type="text" class="form-input" value="MP4 Video (.mp4)" disabled style="font-weight: 600; color: #4FACFE;" />
+            </div>
+
+            <div class="form-group">
               <label>Resolution:</label>
               <select id="export-resolution" class="form-select">
                 <option value="1080p" selected>1080p (Full HD - High Quality)</option>
@@ -79,7 +84,7 @@ export class VideoExporter {
               <button class="btn btn-secondary" id="btn-cancel-config">Cancel</button>
               <button class="btn btn-primary" id="btn-start-export">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span>Start Export</span>
+                <span>Start Export (MP4)</span>
               </button>
             </div>
           </div>
@@ -123,7 +128,7 @@ export class VideoExporter {
           <div class="modal-body" id="export-complete-view" style="display: none;">
             <div class="export-success-badge">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2ED573" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <h4>Reel Video Ready!</h4>
+              <h4>Reel Video Ready (.mp4)!</h4>
             </div>
 
             <div class="export-preview-wrapper">
@@ -133,7 +138,7 @@ export class VideoExporter {
             <div class="modal-footer flex-column">
               <button class="btn btn-primary btn-block" id="btn-download-video">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Download Reel Video</span>
+                <span>Download MP4 Video</span>
               </button>
               <button class="btn btn-secondary btn-block" id="btn-export-again">Export Another Resolution</button>
             </div>
@@ -214,12 +219,17 @@ export class VideoExporter {
    */
   getSupportedMimeType() {
     const types = [
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+      'video/mp4;codecs=avc1,mp4a.40.2',
+      'video/mp4;codecs=avc1',
+      'video/mp4;codecs=h264,aac',
+      'video/mp4;codecs=h264',
+      'video/mp4',
+      'video/webm;codecs=h264,opus',
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=h264,opus',
-      'video/webm',
-      'video/mp4;codecs=avc1,mp4a',
-      'video/mp4'
+      'video/webm'
     ];
 
     for (const type of types) {
@@ -364,12 +374,13 @@ export class VideoExporter {
 
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.onstop = () => {
-        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        this.resultBlob = new Blob(this.recordedChunks, { type: mimeType });
+        const isMp4 = mimeType.includes('mp4');
+        const blobType = isMp4 ? mimeType : 'video/mp4';
+        this.resultBlob = new Blob(this.recordedChunks, { type: blobType });
         this.resultUrl = URL.createObjectURL(this.resultBlob);
         this.isExporting = false;
         this.showCompleteView(this.resultUrl);
-        Utils.showToast('Reel video exported successfully!', 'success');
+        Utils.showToast('Reel video exported in MP4 format!', 'success');
       };
       this.mediaRecorder.stop();
     }
@@ -394,9 +405,8 @@ export class VideoExporter {
   downloadExportedVideo() {
     if (!this.resultBlob || !this.resultUrl) return;
 
-    const ext = this.resultBlob.type.includes('mp4') ? 'mp4' : 'webm';
     const safeName = (State.project.name || 'reel').replace(/[^a-z0-9_\-\u0980-\u09FF]/gi, '_');
-    const filename = `${safeName}_${Date.now()}.${ext}`;
+    const filename = `${safeName}_${Date.now()}.mp4`;
 
     const a = document.createElement('a');
     a.href = this.resultUrl;

@@ -29,6 +29,8 @@ class ReelApp {
     // Playback clock
     this.lastFrameTime = 0;
     this.renderNeeded = true;
+    this.State = State;
+    this.Exporter = Exporter;
   }
 
   async init() {
@@ -58,6 +60,7 @@ class ReelApp {
     this.initEditors();
     this.initToolbar();
     this.initLeftTools();
+    this.setupLayerSelectionSync();
     this.initCanvasInteractions();
     this.initShortcuts();
     this.initPWA();
@@ -160,10 +163,6 @@ class ReelApp {
   initToolbar() {
     const btnUndo = document.getElementById('btn-undo');
     const btnRedo = document.getElementById('btn-redo');
-    const btnSave = document.getElementById('btn-save');
-    const btnNew = document.getElementById('btn-new');
-    const btnOpen = document.getElementById('btn-open');
-    const btnExport = document.getElementById('btn-export');
     const btnSafeArea = document.getElementById('btn-safe-area');
     const inputTitle = document.getElementById('input-project-title');
     const saveBadge = document.getElementById('save-status-badge');
@@ -180,12 +179,12 @@ class ReelApp {
     });
 
     // Undo / Redo
-    btnUndo.addEventListener('click', () => State.undo());
-    btnRedo.addEventListener('click', () => State.redo());
+    if (btnUndo) btnUndo.addEventListener('click', () => State.undo());
+    if (btnRedo) btnRedo.addEventListener('click', () => State.redo());
 
     State.on('historyChange', ({ canUndo, canRedo }) => {
-      btnUndo.disabled = !canUndo;
-      btnRedo.disabled = !canRedo;
+      if (btnUndo) btnUndo.disabled = !canUndo;
+      if (btnRedo) btnRedo.disabled = !canRedo;
     });
 
     // Project Title
@@ -194,47 +193,136 @@ class ReelApp {
       State.setProjectName(e.target.value.trim() || 'Untitled Reel');
     });
 
-    // Save
-    btnSave.addEventListener('click', async () => {
+    // Top Right Save & Project Menu
+    const projectMenuContainer = document.getElementById('project-menu-container');
+    const btnProjectMenu = document.getElementById('btn-project-menu');
+    const menuSaveStatus = document.getElementById('menu-save-status');
+
+    const toggleProjectMenu = (open) => {
+      if (!projectMenuContainer) return;
+      const willOpen = open !== undefined ? open : !projectMenuContainer.classList.contains('open');
+      projectMenuContainer.classList.toggle('open', willOpen);
+      if (btnProjectMenu) btnProjectMenu.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    };
+
+    if (btnProjectMenu) {
+      btnProjectMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleProjectMenu();
+      });
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (projectMenuContainer && !projectMenuContainer.contains(e.target)) {
+        projectMenuContainer.classList.remove('open');
+        if (btnProjectMenu) btnProjectMenu.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && projectMenuContainer && projectMenuContainer.classList.contains('open')) {
+        projectMenuContainer.classList.remove('open');
+        if (btnProjectMenu) btnProjectMenu.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Menu Action: Save Project
+    const menuSave = document.getElementById('menu-item-save');
+    const handleSaveProject = async () => {
+      toggleProjectMenu(false);
       await Storage.saveProject(State.project);
       State.setSaveStatus('saved');
       Utils.showToast('Project saved to local device!', 'success');
+    };
+    if (menuSave) menuSave.addEventListener('click', handleSaveProject);
+
+    // Menu Action: New Project
+    const menuNew = document.getElementById('menu-item-new');
+    if (menuNew) {
+      menuNew.addEventListener('click', () => {
+        toggleProjectMenu(false);
+        if (confirm('Create a new project? Any unsaved edits will be lost.')) {
+          State.initDefaultProject();
+          this.resizeCanvas();
+          inputTitle.value = State.project.name;
+          this.timeline.render();
+          Utils.showToast('New project created', 'info');
+        }
+      });
+    }
+
+    // Menu Action: Open Saved Projects
+    const menuOpen = document.getElementById('menu-item-open');
+    if (menuOpen) {
+      menuOpen.addEventListener('click', () => {
+        toggleProjectMenu(false);
+        this.openProjectsModal();
+      });
+    }
+
+    // Menu Action: Import Project File
+    const menuInputImport = document.getElementById('menu-input-import-file');
+    if (menuInputImport) {
+      menuInputImport.addEventListener('change', async (e) => {
+        toggleProjectMenu(false);
+        const file = e.target.files[0];
+        if (file) {
+          try {
+            await Storage.importProjectFile(file);
+          } catch (err) {
+            Utils.showToast(`Import failed: ${err.message}`, 'error');
+          }
+        }
+        e.target.value = '';
+      });
+    }
+
+    // Menu Action: Export Project JSON
+    const menuExportJson = document.getElementById('menu-item-export-json');
+    if (menuExportJson) {
+      menuExportJson.addEventListener('click', () => {
+        toggleProjectMenu(false);
+        Storage.exportProjectFile(State.project);
+      });
+    }
+
+    // Menu Action: Export Video (MP4)
+    const menuExportVideo = document.getElementById('menu-item-export-video');
+    if (menuExportVideo) {
+      menuExportVideo.addEventListener('click', () => {
+        toggleProjectMenu(false);
+        Exporter.openSettings();
+      });
+    }
+
+    // Backward compatibility for keyboard shortcut Ctrl+S
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveProject();
+      }
     });
 
     State.on('saveStatusChange', (status) => {
       if (status === 'saved') {
-        saveBadge.innerHTML = `<span class="status-dot dot-green"></span> Saved`;
+        if (saveBadge) saveBadge.innerHTML = `<span class="status-dot dot-green"></span> Saved`;
+        if (menuSaveStatus) menuSaveStatus.innerHTML = `<span class="status-dot dot-green"></span> Saved locally`;
       } else if (status === 'saving') {
-        saveBadge.innerHTML = `<span class="status-dot dot-yellow"></span> Saving...`;
+        if (saveBadge) saveBadge.innerHTML = `<span class="status-dot dot-yellow"></span> Saving...`;
+        if (menuSaveStatus) menuSaveStatus.innerHTML = `<span class="status-dot dot-yellow"></span> Saving...`;
       } else {
-        saveBadge.innerHTML = `<span class="status-dot dot-gray"></span> Unsaved`;
+        if (saveBadge) saveBadge.innerHTML = `<span class="status-dot dot-gray"></span> Unsaved`;
+        if (menuSaveStatus) menuSaveStatus.innerHTML = `<span class="status-dot dot-gray"></span> Unsaved changes`;
       }
     });
-
-    // New Project
-    btnNew.addEventListener('click', () => {
-      if (confirm('Create a new project? Any unsaved edits will be lost.')) {
-        State.initDefaultProject();
-        this.resizeCanvas();
-        inputTitle.value = State.project.name;
-        this.timeline.render();
-        Utils.showToast('New project created', 'info');
-      }
-    });
-
-    // Open Project Modal
-    btnOpen.addEventListener('click', () => this.openProjectsModal());
 
     // Safe Area Toggle
     btnSafeArea.addEventListener('click', () => {
       State.showSafeArea = !State.showSafeArea;
       btnSafeArea.classList.toggle('active', State.showSafeArea);
       this.renderNeeded = true;
-    });
-
-    // Export Button
-    btnExport.addEventListener('click', () => {
-      Exporter.openSettings();
     });
 
     // Responsive Top Title Sync
@@ -248,13 +336,26 @@ class ReelApp {
     });
   }
 
-  initLeftTools() {
+  closeMobileDrawer() {
+    const drawer = document.getElementById('tool-panels-drawer');
+    const backdrop = document.getElementById('tool-drawer-backdrop');
+    const toolButtons = document.querySelectorAll('.sidebar-nav-btn');
+    if (drawer) drawer.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('mobile-open');
+    toolButtons.forEach(b => b.classList.remove('active'));
+    const ws = document.querySelector('.app-workspace');
+    if (ws) ws.classList.remove('drawer-open');
+    document.getElementById('app-container')?.classList.remove('drawer-open');
+    this.resizeCanvas();
+    setTimeout(() => this.resizeCanvas(), 50);
+  }
+
+  openToolTab(tool) {
     const toolButtons = document.querySelectorAll('.sidebar-nav-btn');
     const panels = document.querySelectorAll('.tool-panel-tab');
     const drawer = document.getElementById('tool-panels-drawer');
     const backdrop = document.getElementById('tool-drawer-backdrop');
     const drawerTitle = document.getElementById('drawer-active-title');
-    const closeBtn = document.getElementById('btn-close-tool-drawer');
 
     const toolTitles = {
       text: 'Text & Typography',
@@ -265,64 +366,112 @@ class ReelApp {
       audio: 'Audio & Music'
     };
 
-    const closeMobileDrawer = () => {
-      if (drawer) drawer.classList.remove('mobile-open');
-      if (backdrop) backdrop.classList.remove('mobile-open');
-      toolButtons.forEach(b => b.classList.remove('active'));
+    if (tool === 'templates') {
+      this.closeMobileDrawer();
+      this.openTemplatesModal();
+      return;
+    }
+
+    toolButtons.forEach(b => {
+      b.classList.toggle('active', b.dataset.tool === tool);
+    });
+
+    panels.forEach(p => {
+      p.classList.toggle('active', p.id === `tab-${tool}`);
+    });
+
+    if (window.innerWidth <= 768) {
+      if (drawer) drawer.classList.add('mobile-open');
+      if (backdrop) backdrop.classList.add('mobile-open');
+      if (drawerTitle) drawerTitle.textContent = toolTitles[tool] || 'Editing Panel';
       const ws = document.querySelector('.app-workspace');
-      if (ws) ws.classList.remove('drawer-open');
-      document.getElementById('app-container')?.classList.remove('drawer-open');
+      if (ws) ws.classList.add('drawer-open');
+      document.getElementById('app-container')?.classList.add('drawer-open');
       this.resizeCanvas();
       setTimeout(() => this.resizeCanvas(), 50);
-    };
+    }
+
+    this.activeToolTab = tool;
+
+    // Synchronize UI for specific tabs
+    if (tool === 'emoji') {
+      this.syncEmojiUI();
+    } else if (tool === 'shapes') {
+      this.syncShapeUI();
+    } else if (tool === 'handle') {
+      if (this.syncHandleUI) this.syncHandleUI();
+    } else if (tool === 'audio') {
+      if (this.syncAudioUI) this.syncAudioUI();
+    } else if (tool === 'text') {
+      if (this.textEditor) {
+        this.textEditor.loadSelectedElement(State.selectedElementId);
+      }
+    }
+  }
+
+  initLeftTools() {
+    const toolButtons = document.querySelectorAll('.sidebar-nav-btn');
+    const drawer = document.getElementById('tool-panels-drawer');
+    const backdrop = document.getElementById('tool-drawer-backdrop');
+    const closeBtn = document.getElementById('btn-close-tool-drawer');
 
     toolButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const tool = btn.dataset.tool;
         if (tool === 'templates') {
-          closeMobileDrawer();
+          this.closeMobileDrawer();
           this.openTemplatesModal();
           return;
         }
 
         const isAlreadyActive = btn.classList.contains('active') && drawer && drawer.classList.contains('mobile-open');
         if (isAlreadyActive && window.innerWidth <= 768) {
-          closeMobileDrawer();
+          this.closeMobileDrawer();
           return;
         }
 
-        toolButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        panels.forEach(p => {
-          if (p.id === `tab-${tool}`) {
-            p.classList.add('active');
-          } else {
-            p.classList.remove('active');
-          }
-        });
-
-        // Open mobile bottom sheet
-        if (window.innerWidth <= 768) {
-          if (drawer) drawer.classList.add('mobile-open');
-          if (backdrop) backdrop.classList.add('mobile-open');
-          if (drawerTitle) drawerTitle.textContent = toolTitles[tool] || 'Editing Panel';
-          const ws = document.querySelector('.app-workspace');
-          if (ws) ws.classList.add('drawer-open');
-          document.getElementById('app-container')?.classList.add('drawer-open');
-          this.resizeCanvas();
-          setTimeout(() => this.resizeCanvas(), 50);
-        }
-
-        this.activeToolTab = tool;
+        this.openToolTab(tool);
       });
     });
 
-    if (closeBtn) closeBtn.addEventListener('click', closeMobileDrawer);
-    if (backdrop) backdrop.addEventListener('click', closeMobileDrawer);
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeMobileDrawer());
+    if (backdrop) backdrop.addEventListener('click', () => this.closeMobileDrawer());
 
     const dragPill = document.querySelector('.drawer-drag-pill');
-    if (dragPill) dragPill.addEventListener('click', closeMobileDrawer);
+    if (dragPill) dragPill.addEventListener('click', () => this.closeMobileDrawer());
+  }
+
+  setupLayerSelectionSync() {
+    // Whenever any element/track is selected, auto-open the corresponding tool panel
+    State.on('selectionChange', (id) => {
+      if (!id) return;
+
+      if (id === 'audio') {
+        this.openToolTab('audio');
+      } else if (id === 'socialHandle') {
+        this.openToolTab('handle');
+      } else {
+        const elem = State.project.elements.find(e => e.id === id);
+        if (!elem) return;
+
+        if (elem.type === 'text') {
+          this.openToolTab('text');
+        } else if (elem.type === 'emoji') {
+          this.openToolTab('emoji');
+          this.syncEmojiUI(elem);
+        } else if (elem.type === 'shape') {
+          this.openToolTab('shapes');
+          this.syncShapeUI(elem);
+        }
+      }
+    });
+
+    // When project elements are modified, keep the active top panel in sync and auto-hide empty cards
+    State.on('projectChange', () => {
+      this.syncEmojiUI();
+      this.syncShapeUI();
+      if (this.syncAudioUI) this.syncAudioUI();
+    });
   }
 
   initEmojiPanel() {
@@ -354,19 +503,84 @@ class ReelApp {
       };
 
       State.addElement(newEmojiElem);
+      State.selectElement(newEmojiElem.id);
+      this.syncEmojiUI(newEmojiElem);
       Utils.showToast(`Emoji ${emoji} added`, 'success');
     });
 
-    // Emoji size slider
+    // Top Selected Emoji Size slider
     const slider = document.getElementById('input-emoji-size');
+    const valBadge = document.getElementById('val-emoji-size');
     if (slider) {
       slider.addEventListener('input', (e) => {
+        const sz = parseInt(e.target.value, 10);
+        if (valBadge) valBadge.textContent = `${sz}px`;
         const selected = State.getSelectedElement();
         if (selected && selected.type === 'emoji') {
-          State.updateElement(selected.id, { size: parseInt(e.target.value, 10) });
+          State.updateElement(selected.id, { size: sz });
+        } else {
+          const firstEmoji = State.project.elements.find(el => el.type === 'emoji');
+          if (firstEmoji) {
+            State.selectElement(firstEmoji.id);
+            State.updateElement(firstEmoji.id, { size: sz });
+          }
         }
       });
     }
+
+    // Top Delete Emoji Layer button (exclusive to emoji & shapes)
+    const deleteBtn = document.getElementById('btn-delete-emoji-layer');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        let selected = State.getSelectedElement();
+        if (!selected || selected.type !== 'emoji') {
+          selected = State.project.elements.find(e => e.type === 'emoji');
+        }
+        if (selected && selected.type === 'emoji') {
+          const emojiIcon = selected.emoji || 'Emoji';
+          State.removeElement(selected.id);
+          Utils.showToast(`${emojiIcon} layer deleted`, 'info');
+          this.syncEmojiUI();
+        }
+      });
+    }
+
+    this.syncEmojiUI();
+  }
+
+  syncEmojiUI(elem = null) {
+    const card = document.getElementById('selected-emoji-card');
+    if (!card) return;
+
+    const emojiElems = State.project.elements.filter(e => e.type === 'emoji');
+    if (emojiElems.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+
+    card.style.display = 'block';
+
+    if (!elem || elem.type !== 'emoji') {
+      const selected = State.getSelectedElement();
+      if (selected && selected.type === 'emoji') {
+        elem = selected;
+      } else {
+        elem = emojiElems[0];
+      }
+    }
+
+    const preview = document.getElementById('preview-selected-emoji');
+    const slider = document.getElementById('input-emoji-size');
+    const valBadge = document.getElementById('val-emoji-size');
+    const deleteBtn = document.getElementById('btn-delete-emoji-layer');
+
+    card.style.opacity = '1.0';
+    card.style.pointerEvents = 'auto';
+    if (preview) preview.textContent = elem.emoji || '✨';
+    const sz = elem.size || 64;
+    if (slider) slider.value = sz;
+    if (valBadge) valBadge.textContent = `${sz}px`;
+    if (deleteBtn) deleteBtn.disabled = false;
   }
 
   initShapesPanel() {
@@ -403,29 +617,114 @@ class ReelApp {
       };
 
       State.addElement(newShapeElem);
+      State.selectElement(newShapeElem.id);
+      this.syncShapeUI(newShapeElem);
       Utils.showToast(`Decorative ${shapeId} added`, 'success');
     });
 
-    // Shape color & size
+    // Top Shape Color & Size controls
     const colorInput = document.getElementById('input-shape-color');
+    const colorVal = document.getElementById('val-shape-color');
     const sizeInput = document.getElementById('input-shape-size');
+    const sizeVal = document.getElementById('val-shape-size');
+    const deleteBtn = document.getElementById('btn-delete-shape-layer');
+
     if (colorInput) {
       colorInput.addEventListener('input', (e) => {
+        const col = e.target.value;
+        if (colorVal) colorVal.textContent = col.toUpperCase();
         const selected = State.getSelectedElement();
         if (selected && selected.type === 'shape') {
-          State.updateElement(selected.id, { color: e.target.value });
+          State.updateElement(selected.id, { color: col });
+        } else {
+          const firstShape = State.project.elements.find(el => el.type === 'shape');
+          if (firstShape) {
+            State.selectElement(firstShape.id);
+            State.updateElement(firstShape.id, { color: col });
+          }
         }
       });
     }
+
     if (sizeInput) {
       sizeInput.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (sizeVal) sizeVal.textContent = `${val}px`;
         const selected = State.getSelectedElement();
         if (selected && selected.type === 'shape') {
-          const val = parseInt(e.target.value, 10);
           State.updateElement(selected.id, { width: val, height: val });
+        } else {
+          const firstShape = State.project.elements.find(el => el.type === 'shape');
+          if (firstShape) {
+            State.selectElement(firstShape.id);
+            State.updateElement(firstShape.id, { width: val, height: val });
+          }
         }
       });
     }
+
+    // Top Delete Shape Layer button (exclusive to emoji & shapes)
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        let selected = State.getSelectedElement();
+        if (!selected || selected.type !== 'shape') {
+          selected = State.project.elements.find(e => e.type === 'shape');
+        }
+        if (selected && selected.type === 'shape') {
+          State.removeElement(selected.id);
+          Utils.showToast('Decoration layer deleted', 'info');
+          this.syncShapeUI();
+        }
+      });
+    }
+
+    this.syncShapeUI();
+  }
+
+  syncShapeUI(elem = null) {
+    const card = document.getElementById('selected-shape-card');
+    if (!card) return;
+
+    const shapeElems = State.project.elements.filter(e => e.type === 'shape');
+    if (shapeElems.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+
+    card.style.display = 'block';
+
+    if (!elem || elem.type !== 'shape') {
+      const selected = State.getSelectedElement();
+      if (selected && selected.type === 'shape') {
+        elem = selected;
+      } else {
+        elem = shapeElems[0];
+      }
+    }
+
+    const label = document.getElementById('label-selected-shape');
+    const colorInput = document.getElementById('input-shape-color');
+    const colorVal = document.getElementById('val-shape-color');
+    const sizeInput = document.getElementById('input-shape-size');
+    const sizeVal = document.getElementById('val-shape-size');
+    const deleteBtn = document.getElementById('btn-delete-shape-layer');
+
+    card.style.opacity = '1.0';
+    card.style.pointerEvents = 'auto';
+
+    const shapePreset = Presets.shapes.find(s => s.id === elem.shape);
+    const name = shapePreset ? shapePreset.name : (elem.shape || 'Decoration');
+    if (label) label.textContent = name;
+
+    const col = elem.color || '#685B53';
+    if (colorInput) colorInput.value = col;
+    if (colorVal) colorVal.textContent = col.toUpperCase();
+
+    const sz = elem.width || 60;
+    if (sizeInput) sizeInput.value = sz;
+    if (sizeVal) sizeVal.textContent = `${sz}px`;
+
+    if (deleteBtn) deleteBtn.disabled = false;
   }
 
   initHandlePanel() {
@@ -438,7 +737,7 @@ class ReelApp {
 
     if (!checkEnable) return;
 
-    const syncHandleUI = () => {
+    this.syncHandleUI = () => {
       const handle = State.project.socialHandle || {};
       checkEnable.checked = !!handle.enabled;
       inputText.value = handle.text || '@yourname';
@@ -473,8 +772,8 @@ class ReelApp {
       State.updateSocialHandle({ backgroundBadge: { ...current, enabled: e.target.checked } });
     });
 
-    State.on('projectLoaded', syncHandleUI);
-    syncHandleUI();
+    State.on('projectLoaded', () => this.syncHandleUI());
+    this.syncHandleUI();
   }
 
   initAudioPanel() {
@@ -485,14 +784,37 @@ class ReelApp {
     const checkLoop = document.getElementById('check-audio-loop');
     const btnPreview = document.getElementById('btn-preview-audio');
 
+    const importedCard = document.getElementById('imported-audio-card');
+    const labelImportedName = document.getElementById('label-imported-audio-name');
+    const badgeImportedType = document.getElementById('badge-imported-audio-type');
+    const btnRemoveImported = document.getElementById('btn-remove-imported-audio');
+
     if (!checkEnable) return;
 
-    const syncAudioUI = () => {
+    this.syncAudioUI = () => {
       const audio = State.project.audio || {};
       checkEnable.checked = !!audio.enabled;
       inputVolume.value = audio.volume !== undefined ? audio.volume : 0.85;
       checkLoop.checked = audio.loop !== undefined ? audio.loop : true;
-      if (audio.trackId) selectBundled.value = audio.trackId;
+
+      const isImported = audio.sourceType === 'local' || !!audio.blobId;
+      if (importedCard) {
+        if (isImported && audio.name) {
+          importedCard.style.display = 'block';
+          if (labelImportedName) {
+            labelImportedName.textContent = audio.name;
+          }
+          if (badgeImportedType) {
+            badgeImportedType.textContent = 'Imported File';
+          }
+        } else {
+          importedCard.style.display = 'none';
+        }
+      }
+
+      if (!isImported && audio.trackId && selectBundled) {
+        selectBundled.value = audio.trackId;
+      }
     };
 
     checkEnable.addEventListener('change', async (e) => {
@@ -506,6 +828,7 @@ class ReelApp {
           AudioSys.playAt(State.currentTime);
         }
       }
+      this.syncAudioUI();
     });
 
     selectBundled.addEventListener('change', async (e) => {
@@ -526,6 +849,7 @@ class ReelApp {
           AudioSys.playAt(State.currentTime);
         }
         Utils.showToast(`Selected: ${bundled.name}`, 'info');
+        this.syncAudioUI();
       }
     });
 
@@ -534,8 +858,35 @@ class ReelApp {
       const file = e.target.files[0];
       if (file) {
         await AudioSys.importLocalAudioFile(file);
+        this.syncAudioUI();
       }
+      inputFile.value = '';
     });
+
+    if (btnRemoveImported) {
+      btnRemoveImported.addEventListener('click', async () => {
+        const bundled = Presets.bundledAudio[0];
+        if (bundled) {
+          State.updateAudio({
+            enabled: true,
+            trackId: bundled.id,
+            name: bundled.name,
+            sourceType: 'bundled',
+            sourceUrl: bundled.url,
+            blobId: null
+          });
+          this.syncAudioUI();
+          Utils.showToast(`Reverted to bundled music: ${bundled.name}`, 'info');
+          try {
+            await AudioSys.unlockAudioContext();
+            await AudioSys.loadTrack(State.project.audio);
+            if (State.isPlaying) {
+              AudioSys.playAt(State.currentTime);
+            }
+          } catch (e) {}
+        }
+      });
+    }
 
     inputVolume.addEventListener('input', (e) => {
       const vol = parseFloat(e.target.value);
@@ -558,8 +909,9 @@ class ReelApp {
       }
     });
 
-    State.on('projectLoaded', syncAudioUI);
-    syncAudioUI();
+    State.on('projectLoaded', () => this.syncAudioUI());
+    State.on('audioUpdate', () => this.syncAudioUI());
+    this.syncAudioUI();
   }
 
   initCanvasInteractions() {
@@ -567,12 +919,20 @@ class ReelApp {
 
     const getCanvasCoords = (e) => {
       const rect = canvas.getBoundingClientRect();
-      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-      const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      let clientX = e.clientX;
+      let clientY = e.clientY;
+
+      if (clientX === undefined && e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if (clientX === undefined && e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+      }
 
       // Normalization to canvas internal resolution
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
+      const scaleX = rect.width ? canvas.width / rect.width : 1;
+      const scaleY = rect.height ? canvas.height / rect.height : 1;
 
       return {
         x: (clientX - rect.left) * scaleX,
@@ -580,16 +940,26 @@ class ReelApp {
       };
     };
 
+    let activePointerId = null;
+
     const handlePointerDown = (e) => {
       const { x, y } = getCanvasCoords(e);
       const hit = this.renderer.hitTest(x, y, canvas.width, canvas.height);
 
       if (hit) {
         e.preventDefault(); // Prevent page scrolling during drag
+        activePointerId = e.pointerId;
+        if (canvas.setPointerCapture && e.pointerId !== undefined) {
+          try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+
         State.selectElement(hit.id);
 
         const elem = hit.id === 'socialHandle' ? State.project.socialHandle : State.project.elements.find(el => el.id === hit.id);
         if (!elem) return;
+
+        // Record undo snapshot prior to transformation
+        State.pushUndo(`Move / Transform ${hit.id}`);
 
         this.canvasDrag = {
           type: hit.handle,
@@ -606,6 +976,7 @@ class ReelApp {
 
         window.addEventListener('pointermove', handlePointerMove, { passive: false });
         window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp);
       } else {
         // Clicked outside elements -> deselect
         State.selectElement(null);
@@ -625,6 +996,9 @@ class ReelApp {
         const dy = (y - drag.startY) / canvas.height;
         elem.x = Utils.clamp(drag.origX + dx, -0.3, 1.3);
         elem.y = Utils.clamp(drag.origY + dy, -0.3, 1.3);
+        if (elem.positionPreset) {
+          elem.positionPreset = 'custom';
+        }
       } else if (drag.type === 'rot') {
         const cx = elem.x * canvas.width;
         const cy = elem.y * canvas.height;
@@ -642,24 +1016,33 @@ class ReelApp {
         if (elem.type === 'text') {
           elem.fontSize = Math.round(Utils.clamp(drag.origFontSize * ratio, 18, 140));
         } else if (elem.type === 'emoji') {
-          elem.size = Math.round(Utils.clamp(drag.origSize * ratio, 24, 160));
+          elem.size = Math.round(Utils.clamp(drag.origSize * ratio, 24, 180));
+          if (this.activeToolTab === 'emoji') this.syncEmojiUI(elem);
         } else if (elem.type === 'shape') {
-          const newDim = Math.round(Utils.clamp(drag.origSize * ratio, 20, 250));
+          const newDim = Math.round(Utils.clamp(drag.origSize * ratio, 20, 300));
           elem.width = newDim;
           elem.height = newDim;
+          if (this.activeToolTab === 'shapes') this.syncShapeUI(elem);
         }
       }
 
       this.renderNeeded = true;
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e) => {
       if (this.canvasDrag) {
-        State.pushUndo(`Move / Transform ${this.canvasDrag.elemId}`);
         this.canvasDrag = null;
+        State.setSaveStatus('unsaved');
+        State.emit('projectChange', { project: State.project });
+        State.emit('stateRenderNeeded');
+      }
+      if (activePointerId !== null && canvas.releasePointerCapture) {
+        try { canvas.releasePointerCapture(activePointerId); } catch (err) {}
+        activePointerId = null;
       }
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
 
     canvas.addEventListener('pointerdown', handlePointerDown);
@@ -905,19 +1288,23 @@ class ReelApp {
     if (projects.length === 0) {
       listContainer.innerHTML = `<div class="empty-state">No saved projects found on this device.</div>`;
     } else {
-      listContainer.innerHTML = projects.map(p => `
-        <div class="project-item-row ${p.id === State.project.id ? 'active-project' : ''}" data-id="${p.id}">
+      listContainer.innerHTML = projects.map(p => {
+        const safeId = Utils.escapeHtml(p.id);
+        const isActive = p.id === State.project.id ? 'active-project' : '';
+        return `
+        <div class="project-item-row ${isActive}" data-id="${safeId}">
           <div class="project-row-info">
             <span class="project-row-name">${Utils.escapeHtml(p.name || 'Untitled Reel')}</span>
-            <span class="project-row-meta">${Utils.escapeHtml(p.aspectRatio)} • ${p.duration}s • Updated ${new Date(p.updatedAt || Date.now()).toLocaleDateString()}</span>
+            <span class="project-row-meta">${Utils.escapeHtml(p.aspectRatio)} • ${Number(p.duration) || 15}s • Updated ${new Date(p.updatedAt || Date.now()).toLocaleDateString()}</span>
           </div>
           <div class="project-row-actions">
-            <button class="btn btn-sm btn-primary btn-open-p" data-id="${p.id}">Open</button>
-            <button class="btn btn-sm btn-secondary btn-dup-p" data-id="${p.id}">Duplicate</button>
-            <button class="btn btn-sm btn-danger btn-del-p" data-id="${p.id}">Delete</button>
+            <button class="btn btn-sm btn-primary btn-open-p" data-id="${safeId}">Open</button>
+            <button class="btn btn-sm btn-secondary btn-dup-p" data-id="${safeId}">Duplicate</button>
+            <button class="btn btn-sm btn-danger btn-del-p" data-id="${safeId}">Delete</button>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       // Row Actions
       listContainer.onclick = async (e) => {
@@ -990,8 +1377,15 @@ class ReelApp {
 }
 
 // Instantiate and start when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const app = new ReelApp();
-  app.init();
   window.ReelApp = app; // For debugging access
+  window.State = State;
+  window.Utils = Utils;
+  try {
+    await app.init();
+    console.log('[ReelApp] init completed successfully!');
+  } catch (err) {
+    console.error('[ReelApp] init ERROR:', err);
+  }
 });

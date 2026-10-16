@@ -153,6 +153,18 @@
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+.track-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+.track-header.selected-track-header {
+  background: rgba(124, 92, 252, 0.16);
+  color: #FFFFFF;
+  border-left: 3px solid #7C5CFC;
 }
 .track-header.ruler-header {
   height: 28px;
@@ -163,9 +175,44 @@
   position: sticky;
   top: 0;
   z-index: 15;
+  cursor: default;
 }
 .track-header.audio-header {
   color: #38EF7D;
+}
+.track-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: calc(100% - 22px);
+}
+
+.btn-track-delete {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgba(255, 71, 87, 0.15);
+  color: #FF4757;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all var(--transition-fast);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-track-delete:hover {
+  opacity: 1;
+  background: #FF4757;
+  color: #FFFFFF;
+  transform: scale(1.1);
 }
 
 /* Right Column: Scrollable Tracks Area */
@@ -194,6 +241,7 @@
   top: 0;
   z-index: 15;
   cursor: pointer;
+  touch-action: none;
 }
 
 .ruler-ticks {
@@ -216,55 +264,81 @@
   color: var(--text-muted);
 }
 
-.timeline-track-headers .track-header:last-child {
-  margin-bottom: 70px;
+.timeline-track-headers .track-header {
+  margin-bottom: 0;
 }
 
 /* Track Rows */
+.timeline-tracks-rows-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .timeline-track-row {
   height: 40px;
   border-bottom: 1px solid var(--border-subtle);
   position: relative;
   background: rgba(255, 255, 255, 0.01);
+  margin-bottom: 0;
 }
 .timeline-track-row:nth-child(even) {
   background: rgba(255, 255, 255, 0.025);
-}
-.timeline-tracks-content .timeline-track-row:last-child {
-  margin-bottom: 70px;
 }
 
 /* Track Audio with Waveform */
 .timeline-track-row.audio-track {
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
-.audio-waveform-canvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 40px;
-  pointer-events: none;
-  z-index: 1;
+.timeline-track-row.audio-track.selected-audio-track {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .audio-track-block {
   position: absolute;
   top: 3px;
   bottom: 3px;
-  background: rgba(56, 239, 125, 0.18);
+  background: rgba(56, 239, 125, 0.14);
   border: 1px solid rgba(56, 239, 125, 0.5);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   padding: 0 8px;
+  overflow: hidden;
   z-index: 2;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.audio-track-block:hover {
+  background: rgba(56, 239, 125, 0.22);
+  border-color: rgba(56, 239, 125, 0.8);
+}
+.audio-track-block.selected {
+  border-color: #38EF7D;
+  background: rgba(56, 239, 125, 0.24);
+  box-shadow: 0 0 10px rgba(56, 239, 125, 0.45);
+}
+.audio-waveform-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  z-index: 1;
 }
 .audio-name {
   font-size: 11px;
   font-weight: 600;
   color: #38EF7D;
   white-space: nowrap;
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
 }
 
 /* ==========================================================================
@@ -333,10 +407,8 @@
 .timeline-playhead {
   position: absolute;
   top: 0;
-  bottom: 0;
   left: 0;
   width: 2px;
-  background-color: var(--accent);
   pointer-events: none;
   z-index: 50;
   will-change: transform;
@@ -345,12 +417,15 @@
 .playhead-cap {
   position: absolute;
   top: 0;
-  left: -6px;
-  width: 14px;
-  height: 14px;
+  left: -7px;
+  width: 16px;
+  height: 18px;
   background-color: var(--accent);
-  clip-path: polygon(0% 0%, 100% 0%, 100% 60%, 50% 100%, 0% 60%);
+  clip-path: polygon(0% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%);
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
 }
 
 .playhead-line {
@@ -361,4 +436,5 @@
   width: 2px;
   background-color: var(--accent);
   box-shadow: 0 0 6px var(--accent-glow);
+  pointer-events: none;
 }

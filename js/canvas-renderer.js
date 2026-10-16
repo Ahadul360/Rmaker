@@ -25,11 +25,14 @@ export class CanvasRenderer {
     for (const pattern of Presets.patterns) {
       if (pattern.url) {
         const img = new Image();
-        img.src = pattern.url;
+        this.patternImages.set(pattern.id, img);
         img.onload = () => {
-          this.patternImages.set(pattern.id, img);
           State.emit('stateRenderNeeded');
         };
+        img.onerror = (err) => {
+          console.warn(`[CanvasRenderer] Pattern failed to load: ${pattern.id}`, err);
+        };
+        img.src = pattern.url;
       }
     }
   }
@@ -55,8 +58,9 @@ export class CanvasRenderer {
 
     // 2. Render Elements sorted by z-index / array order
     for (const elem of project.elements) {
-      if (timestamp < elem.startTime || timestamp > elem.endTime) {
-        // Element is not active at this timestamp
+      const isSelected = !isExport && State.selectedElementId === elem.id;
+      if (!isSelected && (timestamp < elem.startTime || timestamp > elem.endTime)) {
+        // Element is not active at this timestamp and not selected
         continue;
       }
       this.renderElement(ctx, elem, timestamp, width, height, isExport);
@@ -65,7 +69,8 @@ export class CanvasRenderer {
     // 3. Render Social Media Handle
     if (project.socialHandle && project.socialHandle.enabled) {
       const handle = project.socialHandle;
-      if (handle.alwaysVisible || (timestamp >= handle.startTime && timestamp <= handle.endTime)) {
+      const isSelected = !isExport && State.selectedElementId === 'socialHandle';
+      if (handle.alwaysVisible || isSelected || (timestamp >= handle.startTime && timestamp <= handle.endTime)) {
         this.renderSocialHandle(ctx, handle, timestamp, width, height, isExport);
       }
     }
@@ -129,15 +134,26 @@ export class CanvasRenderer {
 
     // Custom Uploaded Background Image (if present)
     if (bg.imageSrc) {
-      let img = this.bgImages.get(bg.imageSrc);
-      if (!img) {
-        img = new Image();
-        img.src = bg.imageSrc;
-        img.onload = () => {
+      const isSafeSrc = typeof bg.imageSrc === 'string' && (
+        bg.imageSrc.startsWith('data:image/') ||
+        bg.imageSrc.startsWith('blob:') ||
+        bg.imageSrc.startsWith('./assets/') ||
+        bg.imageSrc.startsWith('assets/')
+      );
+
+      if (isSafeSrc) {
+        let img = this.bgImages.get(bg.imageSrc);
+        if (!img) {
+          img = new Image();
           this.bgImages.set(bg.imageSrc, img);
-          State.emit('stateRenderNeeded');
-        };
-      } else if (img.complete && img.naturalWidth > 0) {
+          img.onload = () => {
+            State.emit('stateRenderNeeded');
+          };
+          img.onerror = () => {
+            console.warn('[CanvasRenderer] Could not load background image:', bg.imageSrc.slice(0, 50));
+          };
+          img.src = bg.imageSrc;
+        } else if (img.complete && img.naturalWidth > 0) {
         ctx.save();
         if (bg.blur > 0) ctx.filter = `blur(${bg.blur}px)`;
         const fit = bg.imageFit || 'cover';
@@ -184,6 +200,7 @@ export class CanvasRenderer {
         }
       }
     }
+  }
 
     // Pattern Overlay
     if (bg.pattern && bg.pattern !== 'none') {
@@ -222,6 +239,14 @@ export class CanvasRenderer {
 
     // Calculate animation transform & opacity
     const animState = this.calculateAnimationState(elem, timestamp);
+
+    // In editor preview when paused, ensure elements are visible and interactable even at frame 0
+    if (!isExport && !State.isPlaying) {
+      if (animState.opacity <= 0.1) animState.opacity = 1.0;
+      if (animState.scaleX <= 0.1) animState.scaleX = 1.0;
+      if (animState.scaleY <= 0.1) animState.scaleY = 1.0;
+    }
+
     if (animState.opacity <= 0) {
       ctx.restore();
       return;
@@ -368,7 +393,8 @@ export class CanvasRenderer {
     ctx.textBaseline = 'middle';
     ctx.textAlign = textAlign;
 
-    const maxWrapWidth = (elem.width || 0.8) * canvasWidth;
+    const boxWidth = (elem.width || 0.8) * canvasWidth;
+    const halfBoxW = boxWidth / 2;
     let fullText = elem.text || '';
 
     // Handle grapheme-aware typewriter animation
@@ -378,28 +404,32 @@ export class CanvasRenderer {
       fullText = allGraphemes.slice(0, visibleCount).join('');
     }
 
-    const lines = Utils.wrapText(fullText, maxWrapWidth, str => ctx.measureText(str).width);
+    const lines = Utils.wrapText(fullText, boxWidth, str => ctx.measureText(str).width);
     const lineSpacing = fontSize * lineHeight;
     const totalTextHeight = lines.length * lineSpacing;
 
-    // Measure total bounding box
+    // Measure total bounding box of actual text lines
     let maxLineWidth = 0;
     for (const line of lines) {
       const w = ctx.measureText(line).width;
       if (w > maxLineWidth) maxLineWidth = w;
     }
 
-    const halfW = maxLineWidth / 2;
     const halfH = totalTextHeight / 2;
 
     // Draw Background Badge (if enabled)
     if (elem.backgroundBadge && elem.backgroundBadge.enabled) {
       const pad = elem.backgroundBadge.padding || 16;
       const radius = elem.backgroundBadge.borderRadius || 12;
-      const bgX = -halfW - pad;
-      const bgY = -halfH - pad;
       const bgW = maxLineWidth + pad * 2;
       const bgH = totalTextHeight + pad * 2;
+      let bgX = -bgW / 2;
+      if (textAlign === 'left') {
+        bgX = -halfBoxW - pad;
+      } else if (textAlign === 'right') {
+        bgX = halfBoxW - maxLineWidth - pad;
+      }
+      const bgY = -halfH - pad;
 
       ctx.save();
       ctx.fillStyle = elem.backgroundBadge.color || 'rgba(255,255,255,0.7)';
@@ -416,14 +446,17 @@ export class CanvasRenderer {
       ctx.shadowOffsetY = elem.shadow.offsetY || 2;
     }
 
-    // Render Text Lines
+    // Render Text Lines with accurate alignment
     const startY = -halfH + lineSpacing / 2;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const y = startY + i * lineSpacing;
       let x = 0;
-      if (textAlign === 'left') x = -halfW;
-      else if (textAlign === 'right') x = halfW;
+      if (textAlign === 'left') {
+        x = -halfBoxW;
+      } else if (textAlign === 'right') {
+        x = halfBoxW;
+      }
 
       // Stroke / outline
       if (elem.stroke && elem.stroke.width > 0) {
@@ -437,10 +470,11 @@ export class CanvasRenderer {
       ctx.fillText(line, x, y);
     }
 
+    const boundW = Math.max(boxWidth, maxLineWidth);
     return {
-      x: -halfW,
+      x: -boundW / 2,
       y: -halfH,
-      width: Math.max(80, maxLineWidth),
+      width: boundW,
       height: Math.max(40, totalTextHeight)
     };
   }
@@ -791,8 +825,12 @@ export class CanvasRenderer {
     const localX = dx * Math.cos(rad) - dy * Math.sin(rad);
     const localY = dx * Math.sin(rad) + dy * Math.cos(rad);
 
-    const halfW = width / 2 + 10;
-    const halfH = height / 2 + 10;
+    // Generous touch tolerance for finger and mouse (especially for small emojis and shapes)
+    const touchPadding = 28;
+    const effectiveW = Math.max(width, 80);
+    const effectiveH = Math.max(height, 80);
+    const halfW = effectiveW / 2 + touchPadding;
+    const halfH = effectiveH / 2 + touchPadding;
 
     return localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH;
   }
@@ -807,10 +845,10 @@ export class CanvasRenderer {
 
     const halfW = width / 2 + 6;
     const halfH = height / 2 + 6;
-    const hitRadius = 14;
+    const hitRadius = 24; // Generous touch target for handles
 
     // Rotation handle
-    if (Math.hypot(localX - 0, localY - (-halfH - 20)) <= hitRadius) {
+    if (Math.hypot(localX - 0, localY - (-halfH - 26)) <= hitRadius) {
       return 'rot';
     }
 

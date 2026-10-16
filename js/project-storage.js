@@ -6,6 +6,7 @@
 
 import { Utils } from './utils.js';
 import { State } from './state.js';
+import { Presets } from './presets.js';
 
 class ProjectStorage {
   constructor() {
@@ -160,6 +161,193 @@ class ProjectStorage {
   }
 
   /**
+   * Deeply sanitizes an object to eliminate prototype pollution vectors.
+   */
+  sanitizeDeep(obj, depth = 0) {
+    if (depth > 20 || !obj || typeof obj !== 'object') {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizeDeep(item, depth + 1));
+    }
+    const safeObj = {};
+    for (const key of Object.keys(obj)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        continue;
+      }
+      safeObj[key] = this.sanitizeDeep(obj[key], depth + 1);
+    }
+    return safeObj;
+  }
+
+  /**
+   * Validates and sanitizes a parsed project object to guarantee structural and security integrity.
+   */
+  validateAndSanitizeProject(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('Project must be a valid JSON object');
+    }
+
+    const clean = this.sanitizeDeep(raw);
+
+    // Validate aspect ratio
+    const validRatios = ['9:16', '1:1', '4:5'];
+    const aspectRatio = validRatios.includes(clean.aspectRatio) ? clean.aspectRatio : '9:16';
+
+    // Validate duration
+    let duration = Number(clean.duration);
+    if (!Number.isFinite(duration) || duration < 1 || duration > 180) {
+      duration = 15;
+    }
+
+    // Validate elements
+    const validElements = [];
+    if (Array.isArray(clean.elements)) {
+      for (const elem of clean.elements) {
+        if (!elem || typeof elem !== 'object') continue;
+        const validTypes = ['text', 'emoji', 'shape', 'socialHandle'];
+        if (!validTypes.includes(elem.type)) continue;
+
+        // Clean & sanitize ID
+        const safeId = typeof elem.id === 'string' && /^[a-zA-Z0-9_\-]+$/.test(elem.id)
+          ? elem.id
+          : Utils.generateId(elem.type);
+
+        const safeElem = {
+          id: safeId,
+          type: elem.type,
+          startTime: Utils.clamp(Number.isFinite(Number(elem.startTime)) ? Number(elem.startTime) : 0, 0, duration),
+          endTime: Utils.clamp(Number.isFinite(Number(elem.endTime)) ? Number(elem.endTime) : duration, 0.1, duration),
+          x: Utils.clamp(Number.isFinite(Number(elem.x)) ? Number(elem.x) : 0.5, -1, 2),
+          y: Utils.clamp(Number.isFinite(Number(elem.y)) ? Number(elem.y) : 0.5, -1, 2),
+          scale: Utils.clamp(Number.isFinite(Number(elem.scale)) ? Number(elem.scale) : 1, 0.1, 10),
+          rotation: Number.isFinite(Number(elem.rotation)) ? Number(elem.rotation) % 360 : 0,
+          opacity: Utils.clamp(Number.isFinite(Number(elem.opacity)) ? Number(elem.opacity) : 1, 0, 1),
+          animation: typeof elem.animation === 'string' ? elem.animation.slice(0, 50) : 'none',
+          animationDuration: Utils.clamp(Number.isFinite(Number(elem.animationDuration)) ? Number(elem.animationDuration) : 0.8, 0.1, 5)
+        };
+
+        if (elem.type === 'text') {
+          safeElem.text = String(elem.text || '').slice(0, 5000);
+          safeElem.fontSize = Utils.clamp(Number(elem.fontSize) || 36, 8, 200);
+          safeElem.fontFamily = String(elem.fontFamily || 'Hind Siliguri').slice(0, 80);
+          safeElem.fontWeight = String(elem.fontWeight || 'normal').slice(0, 20);
+          safeElem.color = String(elem.color || '#2D2926').slice(0, 30);
+          safeElem.align = ['left', 'center', 'right'].includes(elem.align) ? elem.align : 'center';
+          safeElem.lineHeight = Utils.clamp(Number(elem.lineHeight) || 1.3, 0.8, 3.0);
+          safeElem.letterSpacing = Utils.clamp(Number(elem.letterSpacing) || 0, -5, 20);
+          safeElem.shadow = !!elem.shadow;
+          safeElem.shadowColor = String(elem.shadowColor || 'rgba(0,0,0,0.5)').slice(0, 40);
+          safeElem.shadowBlur = Utils.clamp(Number(elem.shadowBlur) || 8, 0, 50);
+          safeElem.shadowOffsetX = Utils.clamp(Number(elem.shadowOffsetX) || 2, -50, 50);
+          safeElem.shadowOffsetY = Utils.clamp(Number(elem.shadowOffsetY) || 3, -50, 50);
+          safeElem.stroke = !!elem.stroke;
+          safeElem.strokeColor = String(elem.strokeColor || '#000000').slice(0, 30);
+          safeElem.strokeWidth = Utils.clamp(Number(elem.strokeWidth) || 2, 0, 30);
+          safeElem.bgBadge = !!elem.bgBadge;
+          safeElem.badgeColor = String(elem.badgeColor || 'rgba(0,0,0,0.5)').slice(0, 40);
+          safeElem.badgeRadius = Utils.clamp(Number(elem.badgeRadius) || 8, 0, 50);
+          safeElem.badgePadding = Utils.clamp(Number(elem.badgePadding) || 10, 0, 50);
+        } else if (elem.type === 'emoji') {
+          safeElem.emoji = String(elem.emoji || '✨').slice(0, 10);
+          safeElem.size = Utils.clamp(Number(elem.size) || 72, 16, 300);
+        } else if (elem.type === 'shape') {
+          safeElem.shape = String(elem.shape || 'star').slice(0, 50);
+          safeElem.size = Utils.clamp(Number(elem.size) || 64, 10, 300);
+          safeElem.color = String(elem.color || '#2D2926').slice(0, 30);
+          safeElem.fill = !!elem.fill;
+          safeElem.strokeWidth = Utils.clamp(Number(elem.strokeWidth) || 3, 1, 30);
+        }
+
+        validElements.push(safeElem);
+      }
+    }
+
+    // Sanitize background
+    const bg = clean.background && typeof clean.background === 'object' ? clean.background : {};
+    let safeImageSrc = null;
+    if (typeof bg.imageSrc === 'string') {
+      // Only allow safe data URI or relative assets, strictly reject javascript: or dangerous schemes
+      if (bg.imageSrc.startsWith('data:image/') || bg.imageSrc.startsWith('blob:') || bg.imageSrc.startsWith('./assets/') || bg.imageSrc.startsWith('assets/')) {
+        safeImageSrc = bg.imageSrc;
+      }
+    }
+
+    const safeBg = {
+      type: typeof bg.type === 'string' ? bg.type.slice(0, 50) : 'cream-paper',
+      color: typeof bg.color === 'string' ? bg.color.slice(0, 30) : '#F7F4EB',
+      gradient: Array.isArray(bg.gradient) ? bg.gradient.slice(0, 5).map(c => String(c).slice(0, 30)) : null,
+      gradientAngle: Number.isFinite(Number(bg.gradientAngle)) ? Number(bg.gradientAngle) % 360 : 135,
+      pattern: typeof bg.pattern === 'string' ? bg.pattern.slice(0, 60) : 'none',
+      patternOpacity: Utils.clamp(Number.isFinite(Number(bg.patternOpacity)) ? Number(bg.patternOpacity) : 0.35, 0, 1),
+      patternScale: Utils.clamp(Number.isFinite(Number(bg.patternScale)) ? Number(bg.patternScale) : 1.0, 0.2, 5),
+      patternBlend: typeof bg.patternBlend === 'string' ? bg.patternBlend.slice(0, 30) : 'source-over',
+      patternRotation: Number.isFinite(Number(bg.patternRotation)) ? Number(bg.patternRotation) % 360 : 0,
+      imageSrc: safeImageSrc,
+      imageFit: ['cover', 'contain'].includes(bg.imageFit) ? bg.imageFit : 'cover',
+      blur: Utils.clamp(Number.isFinite(Number(bg.blur)) ? Number(bg.blur) : 0, 0, 50),
+      overlayOpacity: Utils.clamp(Number.isFinite(Number(bg.overlayOpacity)) ? Number(bg.overlayOpacity) : 0, 0, 1),
+      overlayColor: typeof bg.overlayColor === 'string' ? bg.overlayColor.slice(0, 30) : '#000000'
+    };
+
+    // Sanitize audio
+    const audio = clean.audio && typeof clean.audio === 'object' ? clean.audio : {};
+    let safeAudioUrl = null;
+    if (typeof audio.sourceUrl === 'string') {
+      if (audio.sourceUrl.startsWith('assets/music/') || audio.sourceUrl.startsWith('./assets/music/')) {
+        safeAudioUrl = audio.sourceUrl;
+      }
+    }
+
+    const safeAudio = {
+      enabled: !!audio.enabled,
+      trackId: typeof audio.trackId === 'string' ? audio.trackId.slice(0, 60) : 'lofi-peace',
+      name: typeof audio.name === 'string' ? audio.name.slice(0, 80) : 'Audio Track',
+      sourceType: audio.sourceType === 'local' ? 'local' : 'bundled',
+      sourceUrl: safeAudioUrl,
+      blobId: typeof audio.blobId === 'string' ? audio.blobId.slice(0, 60) : null,
+      volume: Utils.clamp(Number.isFinite(Number(audio.volume)) ? Number(audio.volume) : 0.85, 0, 1),
+      muted: !!audio.muted,
+      trimStart: Utils.clamp(Number.isFinite(Number(audio.trimStart)) ? Number(audio.trimStart) : 0, 0, duration),
+      trimEnd: Utils.clamp(Number.isFinite(Number(audio.trimEnd)) ? Number(audio.trimEnd) : duration, 0.1, duration),
+      loop: audio.loop !== undefined ? !!audio.loop : true
+    };
+
+    // Sanitize social handle
+    const social = clean.socialHandle && typeof clean.socialHandle === 'object' ? clean.socialHandle : {};
+    const safeSocial = {
+      enabled: !!social.enabled,
+      platform: ['tiktok', 'instagram', 'facebook', 'youtube', 'generic'].includes(social.platform) ? social.platform : 'tiktok',
+      handle: typeof social.handle === 'string' ? social.handle.slice(0, 60) : '@yourhandle',
+      fontSize: Utils.clamp(Number(social.fontSize) || 20, 10, 60),
+      color: typeof social.color === 'string' ? social.color.slice(0, 30) : 'rgba(45, 41, 38, 0.75)',
+      x: Utils.clamp(Number.isFinite(Number(social.x)) ? Number(social.x) : 0.5, 0, 1),
+      y: Utils.clamp(Number.isFinite(Number(social.y)) ? Number(social.y) : 0.88, 0, 1),
+      startTime: 0,
+      endTime: duration,
+      alwaysVisible: true
+    };
+
+    const width = Presets.aspectRatios[aspectRatio]?.width || 1080;
+    const height = Presets.aspectRatios[aspectRatio]?.height || 1920;
+
+    return {
+      id: Utils.generateId('proj_import'),
+      name: `${String(clean.name || 'Imported Project').slice(0, 80)} (Copy)`,
+      aspectRatio,
+      width,
+      height,
+      duration,
+      background: safeBg,
+      elements: validElements,
+      audio: safeAudio,
+      socialHandle: safeSocial,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
+  /**
    * Imports and validates project file
    */
   async importProjectFile(file) {
@@ -168,29 +356,22 @@ class ProjectStorage {
     const text = await file.text();
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text, (key, value) => {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          return undefined;
+        }
+        return value;
+      });
     } catch (e) {
       throw new Error('Invalid JSON file format');
     }
 
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Array.isArray(parsed.elements) || !parsed.aspectRatio) {
-      throw new Error('Invalid ReelMaker project file schema');
-    }
+    const validatedProject = this.validateAndSanitizeProject(parsed);
 
-    // Prototype pollution prevention
-    delete parsed.__proto__;
-    delete parsed.constructor;
-    delete parsed.prototype;
-
-    // Refresh ID so it doesn't overwrite if re-imported
-    parsed.id = Utils.generateId('proj_import');
-    parsed.updatedAt = Date.now();
-    parsed.name = `${String(parsed.name || 'Imported Project').slice(0, 80)} (Copy)`;
-
-    await this.saveProject(parsed);
-    State.loadProject(parsed);
+    await this.saveProject(validatedProject);
+    State.loadProject(validatedProject);
     Utils.showToast('Project imported successfully!', 'success');
-    return parsed;
+    return validatedProject;
   }
 }
 

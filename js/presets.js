@@ -35,13 +35,27 @@ export const Presets = {
     { id: 'sunset-glow', name: 'Sunset Gradient', gradient: ['#FFE259', '#FFA751'], textColor: '#2A1F13' },
     { id: 'moody-night', name: 'Moody Gradient', gradient: ['#202430', '#0E1015'], textColor: '#EAEAEA' },
     { id: 'sage-serenity', name: 'Sage Green', color: '#EAF0E8', pattern: 'doodle-botanical', patternOpacity: 0.3, textColor: '#213322' },
-    { id: 'clean-white', name: 'Minimal White', color: '#FFFFFF', pattern: 'none', textColor: '#1A1A1A' }
+    { id: 'clean-white', name: 'Minimal White', color: '#FFFFFF', pattern: 'none', textColor: '#1A1A1A' },
+    { id: 'midnight-emerald', name: 'Midnight Emerald', color: '#0B1E17', pattern: 'doodle-botanical', patternOpacity: 0.35, patternColor: '#A3D9C9', textColor: '#E5F4EC' },
+    { id: 'royal-lavender', name: 'Royal Lavender', color: '#EFEAFF', pattern: 'doodle-butterflies', patternOpacity: 0.35, patternColor: '#6B528E', textColor: '#2C1B4D' },
+    { id: 'cyber-neon', name: 'Cyber Neon', gradient: ['#180E29', '#3B1A59'], pattern: 'doodle-geometric', patternOpacity: 0.35, patternColor: '#E9D5FF', textColor: '#F5E8FF' },
+    { id: 'matcha-latte', name: 'Matcha Latte', color: '#DFE7DC', pattern: 'doodle-waves', patternOpacity: 0.35, patternColor: '#4A624E', textColor: '#203324' },
+    { id: 'warm-terracotta', name: 'Warm Terracotta', color: '#F3E8E2', pattern: 'doodle-sunburst', patternOpacity: 0.35, patternColor: '#7C4F3C', textColor: '#3A2118' },
+    { id: 'ocean-dusk', name: 'Ocean Dusk', gradient: ['#0E1B2E', '#16384C'], pattern: 'doodle-waves', patternOpacity: 0.35, patternColor: '#93C5FD', textColor: '#E0F2FE' },
+    { id: 'velvet-wine', name: 'Velvet Wine', color: '#240B16', pattern: 'doodle-stars', patternOpacity: 0.32, patternColor: '#F472B6', textColor: '#FDF2F8' },
+    { id: 'vintage-parchment', name: 'Vintage Parchment', color: '#F4EBD9', pattern: 'vintage-grid', patternOpacity: 0.4, patternColor: '#6E523A', textColor: '#322318' }
   ],
 
   patterns: [
     { id: 'none', name: 'None (Plain)', url: '' },
     { id: 'doodle-hearts', name: 'Doodle Hearts', url: 'assets/patterns/doodle-hearts.svg' },
     { id: 'doodle-stars', name: 'Doodle Stars', url: 'assets/patterns/doodle-stars.svg' },
+    { id: 'doodle-butterflies', name: 'Butterflies & Flutters', url: 'assets/patterns/doodle-butterflies.svg' },
+    { id: 'doodle-waves', name: 'Minimal Waves', url: 'assets/patterns/doodle-waves.svg' },
+    { id: 'doodle-coffee', name: 'Coffee & Cozy Café', url: 'assets/patterns/doodle-coffee.svg' },
+    { id: 'doodle-galaxy', name: 'Celestial Galaxy', url: 'assets/patterns/doodle-galaxy.svg' },
+    { id: 'vintage-grid', name: 'Vintage Notebook Grid', url: 'assets/patterns/vintage-grid.svg' },
+    { id: 'doodle-sunburst', name: 'Sunburst & Rays', url: 'assets/patterns/doodle-sunburst.svg' },
     { id: 'doodle-music', name: 'Doodle Music', url: 'assets/patterns/doodle-music.svg' },
     { id: 'doodle-botanical', name: 'Botanical Leaves', url: 'assets/patterns/doodle-botanical.svg' },
     { id: 'doodle-geometric', name: 'Geometric Lines', url: 'assets/patterns/doodle-geometric.svg' },
@@ -84,7 +98,13 @@ export const Presets = {
 
   bundledAudio: [
     { id: 'lofi-peace', name: 'Lofi Peace (Calm & Chill)', url: 'assets/music/lofi-peace-15s.wav', duration: 15 },
-    { id: 'sad-acoustic', name: 'Sad Acoustic (Emotional)', url: 'assets/music/sad-acoustic-15s.wav', duration: 15 }
+    { id: 'sad-acoustic', name: 'Sad Acoustic (Emotional)', url: 'assets/music/sad-acoustic-15s.wav', duration: 15 },
+    { id: 'cinematic-piano', name: 'Cinematic Piano (Inspirational)', url: 'assets/music/cinematic-piano-15s.wav', duration: 15 },
+    { id: 'deep-ambient', name: 'Deep Ambient (Focus & Dreamy)', url: 'assets/music/deep-ambient-15s.wav', duration: 15 },
+    { id: 'night-vibes', name: 'Night Vibes (Chill Lofi Beat)', url: 'assets/music/night-vibes-15s.wav', duration: 15 },
+    { id: 'uplifting-acoustic', name: 'Uplifting Acoustic (Hopeful)', url: 'assets/music/uplifting-acoustic-15s.wav', duration: 15 },
+    { id: 'midnight-rain', name: 'Midnight Rain (Peaceful & Cozy)', url: 'assets/music/midnight-rain-15s.wav', duration: 15 },
+    { id: 'minimal-pulse', name: 'Minimal Pulse (Modern & Sleek)', url: 'assets/music/minimal-pulse-15s.wav', duration: 15 }
   ],
 
   // 10 Full Templates
@@ -141,10 +161,10 @@ export const Presets = {
           shadow: { color: 'rgba(0,0,0,0.08)', blur: 4, offsetX: 0, offsetY: 2 },
           stroke: { color: '#ffffff', width: 0 },
           backgroundBadge: { enabled: false, color: 'rgba(255,255,255,0.7)', padding: 14, borderRadius: 12 },
-          startTime: 0.5,
+          startTime: 0,
           endTime: 15,
           animation: 'fadeIn',
-          animationDuration: 1.2
+          animationDuration: 1.0
         },
         {
           id: 'main-emoji',
@@ -155,7 +175,7 @@ export const Presets = {
           size: 64,
           rotation: 0,
           opacity: 1.0,
-          startTime: 1.2,
+          startTime: 0,
           endTime: 15,
           animation: 'popIn',
           animationDuration: 0.8
@@ -371,10 +391,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'night-vibes',
+        name: 'Night Vibes (Chill Lofi Beat)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/night-vibes-15s.wav',
         volume: 0.85,
         muted: false,
         trimStart: 0,
@@ -576,10 +596,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'uplifting-acoustic',
+        name: 'Uplifting Acoustic (Hopeful)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/uplifting-acoustic-15s.wav',
         volume: 0.85,
         muted: false,
         trimStart: 0,
@@ -649,10 +669,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'midnight-rain',
+        name: 'Midnight Rain (Peaceful & Cozy)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/midnight-rain-15s.wav',
         volume: 0.8,
         muted: false,
         trimStart: 0,
@@ -838,10 +858,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'cinematic-piano',
+        name: 'Cinematic Piano (Inspirational)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/cinematic-piano-15s.wav',
         volume: 0.85,
         muted: false,
         trimStart: 0,
@@ -925,10 +945,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'minimal-pulse',
+        name: 'Minimal Pulse (Modern & Sleek)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/minimal-pulse-15s.wav',
         volume: 0.85,
         muted: false,
         trimStart: 0,
@@ -997,10 +1017,10 @@ export const Presets = {
       },
       audio: {
         enabled: true,
-        trackId: 'lofi-peace',
-        name: 'Lofi Peace (Bundled)',
+        trackId: 'deep-ambient',
+        name: 'Deep Ambient (Focus & Dreamy)',
         sourceType: 'bundled',
-        sourceUrl: 'assets/music/lofi-peace-15s.wav',
+        sourceUrl: 'assets/music/deep-ambient-15s.wav',
         volume: 0.85,
         muted: false,
         trimStart: 0,

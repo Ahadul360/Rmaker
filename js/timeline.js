@@ -63,12 +63,7 @@ export class Timeline {
         <!-- Track Headers (Left column) -->
         <div class="timeline-track-headers" id="timeline-headers">
           <div class="timeline-headers-content" id="timeline-headers-content">
-            <div class="track-header ruler-header">Tracks</div>
-            <div class="track-header"><span>Text Layers</span></div>
-            <div class="track-header"><span>Emojis</span></div>
-            <div class="track-header"><span>Shapes / Deco</span></div>
-            <div class="track-header"><span>Social Handle</span></div>
-            <div class="track-header audio-header"><span>Music Track</span></div>
+            <!-- Dynamically populated in renderTrackBlocks -->
           </div>
         </div>
 
@@ -80,14 +75,17 @@ export class Timeline {
               <div class="ruler-ticks" id="ruler-ticks"></div>
             </div>
 
-            <!-- Tracks -->
-            <div class="timeline-track-row" id="track-text" data-type="text"></div>
-            <div class="timeline-track-row" id="track-emoji" data-type="emoji"></div>
-            <div class="timeline-track-row" id="track-shape" data-type="shape"></div>
-            <div class="timeline-track-row" id="track-handle" data-type="handle"></div>
+            <!-- Dynamic Track Rows Container -->
+            <div class="timeline-tracks-rows-container" id="timeline-tracks-rows">
+              <!-- Dynamically populated in renderTrackBlocks -->
+            </div>
+
+            <!-- Fixed Bottom Audio Track -->
             <div class="timeline-track-row audio-track" id="track-audio">
-              <canvas class="audio-waveform-canvas" id="audio-waveform"></canvas>
-              <div class="audio-track-block" id="audio-block"></div>
+              <div class="audio-track-block" id="audio-block">
+                <canvas class="audio-waveform-canvas" id="audio-waveform"></canvas>
+                <span class="audio-name" id="audio-name-label">🎵 Audio Track</span>
+              </div>
             </div>
 
             <!-- Red Playhead Scrubber -->
@@ -142,16 +140,32 @@ export class Timeline {
 
     // Scrubber click/drag on Ruler & Tracks
     const handleScrubStart = (e) => {
-      // Don't scrub if clicking directly on a clip or clip handle
-      if (e.target.closest('.timeline-block')) return;
+      // Don't scrub if clicking directly on a clip trim handle or delete button
+      if (e.target.closest('.block-trim-handle') || e.target.closest('.btn-track-delete')) return;
+
+      const isPlayheadCap = !!e.target.closest('.playhead-cap');
+      const isRuler = !!e.target.closest('.timeline-ruler');
+      const isTrackAudio = !!e.target.closest('#track-audio');
+
+      // If clicking directly on a block (unless clicking the playhead cap or ruler), don't start scrub
+      if (!isPlayheadCap && !isRuler && e.target.closest('.timeline-block')) return;
+
+      // Clicking on the audio track selects audio layer settings
+      if (isTrackAudio) {
+        State.selectElement('audio');
+      }
+
       this.isScrubbing = true;
       this.scrubToMouse(e);
-      window.addEventListener('pointermove', handleScrubMove);
+      window.addEventListener('pointermove', handleScrubMove, { passive: false });
       window.addEventListener('pointerup', handleScrubEnd);
     };
 
     const handleScrubMove = (e) => {
-      if (this.isScrubbing) this.scrubToMouse(e);
+      if (this.isScrubbing) {
+        if (e.cancelable) e.preventDefault();
+        this.scrubToMouse(e);
+      }
     };
 
     const handleScrubEnd = () => {
@@ -161,6 +175,32 @@ export class Timeline {
     };
 
     this.scrollContainer.addEventListener('pointerdown', handleScrubStart);
+    if (this.playhead) {
+      this.playhead.addEventListener('pointerdown', handleScrubStart);
+    }
+
+    // Audio Track direct click/pointerdown handlers
+    const audioTrackRow = this.container.querySelector('#track-audio');
+    if (audioTrackRow) {
+      audioTrackRow.addEventListener('click', (e) => {
+        State.selectElement('audio');
+      });
+      audioTrackRow.addEventListener('pointerdown', (e) => {
+        State.selectElement('audio');
+      });
+    }
+
+    const audioBlock = this.container.querySelector('#audio-block');
+    if (audioBlock) {
+      audioBlock.addEventListener('click', (e) => {
+        e.stopPropagation();
+        State.selectElement('audio');
+      });
+      audioBlock.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        State.selectElement('audio');
+      });
+    }
 
     // 2-Way Vertical Scroll Synchronization between Tracks and Headers
     const headers = this.container.querySelector('.timeline-track-headers');
@@ -168,6 +208,7 @@ export class Timeline {
 
     if (headers) {
       this.scrollContainer.addEventListener('scroll', () => {
+        this.updatePlayhead(State.currentTime);
         if (isSyncing) return;
         isSyncing = true;
         headers.scrollTop = this.scrollContainer.scrollTop;
@@ -178,6 +219,7 @@ export class Timeline {
         if (isSyncing) return;
         isSyncing = true;
         this.scrollContainer.scrollTop = headers.scrollTop;
+        this.updatePlayhead(State.currentTime);
         isSyncing = false;
       }, { passive: true });
 
@@ -225,8 +267,13 @@ export class Timeline {
   }
 
   updatePlayhead(time) {
+    if (!this.playhead || !this.scrollContainer) return;
     const x = time * this.pixelsPerSecond;
-    this.playhead.style.transform = `translateX(${x}px)`;
+    const scrollTop = this.scrollContainer.scrollTop;
+    const visibleHeight = Math.max(this.scrollContainer.clientHeight, 120);
+    // Move ONLY horizontally with x; keep vertically stationary at scrollTop to match sticky ruler
+    this.playhead.style.transform = `translate3d(${x}px, ${scrollTop}px, 0)`;
+    this.playhead.style.height = `${visibleHeight}px`;
     this.tcCurrent.textContent = Utils.formatTime(time);
   }
 
@@ -269,28 +316,158 @@ export class Timeline {
   }
 
   renderTrackBlocks() {
-    const trackText = this.container.querySelector('#track-text');
-    const trackEmoji = this.container.querySelector('#track-emoji');
-    const trackShape = this.container.querySelector('#track-shape');
-    const trackHandle = this.container.querySelector('#track-handle');
+    const headersContent = this.container.querySelector('#timeline-headers-content');
+    const tracksRows = this.container.querySelector('#timeline-tracks-rows');
 
-    trackText.innerHTML = '';
-    trackEmoji.innerHTML = '';
-    trackShape.innerHTML = '';
-    trackHandle.innerHTML = '';
+    if (!headersContent || !tracksRows) return;
 
-    for (const elem of State.project.elements) {
-      const block = this.createBlockElement(elem);
-      if (elem.type === 'text') trackText.appendChild(block);
-      else if (elem.type === 'emoji') trackEmoji.appendChild(block);
-      else if (elem.type === 'shape') trackShape.appendChild(block);
+    headersContent.innerHTML = '<div class="track-header ruler-header">Tracks</div>';
+    tracksRows.innerHTML = '';
+
+    const textElems = State.project.elements.filter(e => e.type === 'text');
+    const emojiElems = State.project.elements.filter(e => e.type === 'emoji');
+    const shapeElems = State.project.elements.filter(e => e.type === 'shape');
+
+    // 1. Text Layers
+    if (textElems.length === 0) {
+      const h = document.createElement('div');
+      h.className = 'track-header';
+      h.innerHTML = `<span class="track-title">Text</span>`;
+      headersContent.appendChild(h);
+
+      const r = document.createElement('div');
+      r.className = 'timeline-track-row empty-track';
+      r.dataset.type = 'text';
+      tracksRows.appendChild(r);
+    } else {
+      textElems.forEach((elem, i) => {
+        const h = document.createElement('div');
+        h.className = 'track-header';
+        h.dataset.id = elem.id;
+        const textLabel = elem.text ? elem.text.slice(0, 14).replace(/\n/g, ' ') : 'Text';
+        const displayLabel = textElems.length > 1 ? `Text ${i + 1}: ${textLabel}` : `Text: ${textLabel}`;
+        h.innerHTML = `<span class="track-title" title="${Utils.escapeHtml(textLabel)}">${Utils.escapeHtml(displayLabel)}</span>`;
+        h.addEventListener('click', () => State.selectElement(elem.id));
+        headersContent.appendChild(h);
+
+        const r = document.createElement('div');
+        r.className = 'timeline-track-row';
+        r.dataset.id = elem.id;
+        r.dataset.type = 'text';
+        r.appendChild(this.createBlockElement(elem));
+        tracksRows.appendChild(r);
+      });
     }
 
-    // Social Handle Block
+    // 2. Separate Layer for every Emoji
+    if (emojiElems.length === 0) {
+      const h = document.createElement('div');
+      h.className = 'track-header';
+      h.innerHTML = `<span class="track-title">Emoji</span>`;
+      headersContent.appendChild(h);
+
+      const r = document.createElement('div');
+      r.className = 'timeline-track-row empty-track';
+      r.dataset.type = 'emoji';
+      tracksRows.appendChild(r);
+    } else {
+      emojiElems.forEach((elem, i) => {
+        const h = document.createElement('div');
+        h.className = 'track-header';
+        h.dataset.id = elem.id;
+        const emojiLabel = `Emoji ${emojiElems.length > 1 ? (i + 1) + ' ' : ''}${elem.emoji || '✨'}`;
+        h.innerHTML = `
+          <span class="track-title" title="${Utils.escapeHtml(emojiLabel)}">${Utils.escapeHtml(emojiLabel)}</span>
+          <button class="btn-track-delete" data-id="${Utils.escapeHtml(elem.id)}" title="Delete Emoji Layer">&times;</button>
+        `;
+        h.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-track-delete')) {
+            e.stopPropagation();
+            State.removeElement(elem.id);
+            Utils.showToast('Emoji layer deleted', 'info');
+            return;
+          }
+          State.selectElement(elem.id);
+        });
+        headersContent.appendChild(h);
+
+        const r = document.createElement('div');
+        r.className = 'timeline-track-row';
+        r.dataset.id = elem.id;
+        r.dataset.type = 'emoji';
+        r.appendChild(this.createBlockElement(elem));
+        tracksRows.appendChild(r);
+      });
+    }
+
+    // 3. Separate Layer for every Shape or Deco
+    if (shapeElems.length === 0) {
+      const h = document.createElement('div');
+      h.className = 'track-header';
+      h.innerHTML = `<span class="track-title">Shapes / Deco</span>`;
+      headersContent.appendChild(h);
+
+      const r = document.createElement('div');
+      r.className = 'timeline-track-row empty-track';
+      r.dataset.type = 'shape';
+      tracksRows.appendChild(r);
+    } else {
+      shapeElems.forEach((elem, i) => {
+        const h = document.createElement('div');
+        h.className = 'track-header';
+        h.dataset.id = elem.id;
+        const rawShape = elem.shape || 'Deco';
+        const formattedShape = rawShape.charAt(0).toUpperCase() + rawShape.slice(1);
+        const decoLabel = `Deco ${shapeElems.length > 1 ? (i + 1) + ': ' : ''}${formattedShape}`;
+        h.innerHTML = `
+          <span class="track-title" title="${Utils.escapeHtml(decoLabel)}">${Utils.escapeHtml(decoLabel)}</span>
+          <button class="btn-track-delete" data-id="${Utils.escapeHtml(elem.id)}" title="Delete Deco Layer">&times;</button>
+        `;
+        h.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-track-delete')) {
+            e.stopPropagation();
+            State.removeElement(elem.id);
+            Utils.showToast('Deco layer deleted', 'info');
+            return;
+          }
+          State.selectElement(elem.id);
+        });
+        headersContent.appendChild(h);
+
+        const r = document.createElement('div');
+        r.className = 'timeline-track-row';
+        r.dataset.id = elem.id;
+        r.dataset.type = 'shape';
+        r.appendChild(this.createBlockElement(elem));
+        tracksRows.appendChild(r);
+      });
+    }
+
+    // 4. Social Handle Layer
+    const handleHeader = document.createElement('div');
+    handleHeader.className = 'track-header';
+    handleHeader.dataset.id = 'socialHandle';
+    handleHeader.innerHTML = `<span class="track-title">Social Handle</span>`;
+    handleHeader.addEventListener('click', () => State.selectElement('socialHandle'));
+    headersContent.appendChild(handleHeader);
+
+    const handleRow = document.createElement('div');
+    handleRow.className = 'timeline-track-row';
+    handleRow.id = 'track-handle';
+    handleRow.dataset.type = 'handle';
     if (State.project.socialHandle && State.project.socialHandle.enabled) {
-      const handleBlock = this.createBlockElement(State.project.socialHandle, 'socialHandle');
-      trackHandle.appendChild(handleBlock);
+      handleRow.appendChild(this.createBlockElement(State.project.socialHandle, 'socialHandle'));
     }
+    tracksRows.appendChild(handleRow);
+
+    // 5. Audio Track Header
+    const audioHeader = document.createElement('div');
+    audioHeader.className = 'track-header audio-header';
+    audioHeader.dataset.id = 'audio';
+    audioHeader.innerHTML = `<span>Music Track</span>`;
+    audioHeader.addEventListener('click', () => State.selectElement('audio'));
+    audioHeader.addEventListener('pointerdown', () => State.selectElement('audio'));
+    headersContent.appendChild(audioHeader);
   }
 
   createBlockElement(elem, customId = null) {
@@ -419,44 +596,69 @@ export class Timeline {
     const selectedId = State.selectedElementId;
     const blocks = this.container.querySelectorAll('.timeline-block');
     for (const b of blocks) {
-      if (b.dataset.id === selectedId) {
-        b.classList.add('selected');
-      } else {
-        b.classList.remove('selected');
-      }
+      b.classList.toggle('selected', b.dataset.id === selectedId);
+    }
+    const headers = this.container.querySelectorAll('.timeline-track-headers .track-header');
+    for (const h of headers) {
+      h.classList.toggle('selected-track-header', h.dataset.id === selectedId);
+    }
+    const audioTrack = this.container.querySelector('#track-audio');
+    if (audioTrack) {
+      audioTrack.classList.toggle('selected-audio-track', selectedId === 'audio');
+    }
+    const audioBlock = this.container.querySelector('#audio-block');
+    if (audioBlock) {
+      audioBlock.classList.toggle('selected', selectedId === 'audio');
     }
   }
 
   drawWaveform() {
-    const canvas = this.waveformCanvas;
-    if (!canvas) return;
-
     const audioBlock = this.container.querySelector('#audio-block');
     const audio = State.project.audio;
+
+    if (!audioBlock) return;
 
     if (!audio || !audio.enabled) {
       audioBlock.style.display = 'none';
       return;
     }
 
-    audioBlock.style.display = 'block';
-    const duration = State.project.duration;
-    const trackWidth = duration * this.pixelsPerSecond;
+    audioBlock.style.display = 'flex';
+    const duration = State.project.duration || 15;
+    const trackWidth = Math.max(20, duration * this.pixelsPerSecond);
+    audioBlock.style.left = '0px';
     audioBlock.style.width = `${trackWidth}px`;
-    const safeAudioName = Utils.escapeHtml(audio.name || 'Audio Track');
-    audioBlock.innerHTML = `<span class="audio-name">🎵 ${safeAudioName}</span>`;
 
-    // Render peaks to canvas
+    let canvas = audioBlock.querySelector('#audio-waveform');
+    let nameLabel = audioBlock.querySelector('#audio-name-label');
+
+    const safeAudioName = Utils.escapeHtml(audio.name || 'Audio Track');
+
+    if (!canvas || !nameLabel) {
+      audioBlock.innerHTML = `
+        <canvas class="audio-waveform-canvas" id="audio-waveform"></canvas>
+        <span class="audio-name" id="audio-name-label">🎵 ${safeAudioName}</span>
+      `;
+      canvas = audioBlock.querySelector('#audio-waveform');
+      nameLabel = audioBlock.querySelector('#audio-name-label');
+    } else {
+      nameLabel.textContent = `🎵 ${audio.name || 'Audio Track'}`;
+    }
+
+    this.waveformCanvas = canvas;
+    if (!canvas) return;
+
     const peaks = AudioSys.waveformPeaks;
     if (!peaks || peaks.length === 0) return;
 
-    const trackRow = this.container.querySelector('#track-audio');
+    const blockHeight = audioBlock.clientHeight > 0 ? audioBlock.clientHeight : 34;
     canvas.width = trackWidth;
-    canvas.height = trackRow && trackRow.clientHeight > 0 ? trackRow.clientHeight : 40;
+    canvas.height = blockHeight;
+
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = 'rgba(139, 124, 255, 0.45)';
+    ctx.fillStyle = 'rgba(56, 239, 125, 0.45)';
     const barWidth = 3;
     const gap = 2;
     const totalBars = Math.floor(trackWidth / (barWidth + gap));
@@ -464,8 +666,8 @@ export class Timeline {
 
     for (let i = 0; i < totalBars; i++) {
       const peakIdx = Math.floor((i / totalBars) * peaks.length);
-      const val = peaks[peakIdx] || 0.1;
-      const barH = Math.max(4, val * (canvas.height - 6));
+      const val = peaks[peakIdx] || 0.15;
+      const barH = Math.max(3, val * (canvas.height - 8));
       const x = i * (barWidth + gap);
 
       ctx.fillRect(x, centerY - barH / 2, barWidth, barH);

@@ -98,8 +98,12 @@ class AudioEngine {
           arrayBuffer = await Utils.readFileAsArrayBuffer(blob);
         }
       } else if (audioConfig.sourceUrl) {
-        // Fetch bundled asset
-        const url = audioConfig.sourceUrl.startsWith('./') ? audioConfig.sourceUrl : `./${audioConfig.sourceUrl}`;
+        // Confine sourceUrl strictly to local bundled tracks under assets/music/
+        const cleanPath = String(audioConfig.sourceUrl).replace(/^\.\//, '');
+        if (!cleanPath.startsWith('assets/music/') || cleanPath.includes('..')) {
+          throw new Error('Unauthorized or invalid audio source path');
+        }
+        const url = `./${cleanPath}`;
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status} fetching ${url}`);
@@ -261,7 +265,8 @@ class AudioEngine {
       State.updateAudio({
         enabled: true,
         trackId: blobId,
-        name: file.name.replace(/\.[^/.]+$/, ''),
+        name: file.name,
+        fileName: file.name,
         sourceType: 'local',
         blobId: blobId,
         sourceUrl: null,

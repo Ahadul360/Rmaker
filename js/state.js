@@ -213,11 +213,9 @@ class StateManager {
 
   // Selection
   selectElement(id) {
-    if (this.selectedElementId !== id) {
-      this.selectedElementId = id;
-      this.emit('selectionChange', this.selectedElementId);
-      this.emit('stateRenderNeeded');
-    }
+    this.selectedElementId = id;
+    this.emit('selectionChange', this.selectedElementId);
+    this.emit('stateRenderNeeded');
   }
 
   getSelectedElement() {

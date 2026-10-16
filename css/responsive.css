@@ -12,6 +12,15 @@
     --timeline-height: 310px;
   }
 
+  /* 1. Hide Undo and Redo on Tablet */
+  #btn-undo,
+  #btn-redo,
+  #group-undo-redo,
+  .undo-redo-group,
+  .sep-undo-redo {
+    display: none !important;
+  }
+
   .project-title-input {
     width: 130px;
   }
@@ -39,6 +48,15 @@
     --timeline-height: 270px;
   }
 
+  /* 1. Hide Undo and Redo on Mobile */
+  #btn-undo,
+  #btn-redo,
+  #group-undo-redo,
+  .undo-redo-group,
+  .sep-undo-redo {
+    display: none !important;
+  }
+
   /* Compact Top Header */
   .app-header {
     padding: 0 10px;
@@ -52,6 +70,22 @@
   .project-title-input {
     width: 110px;
     font-size: 12px;
+  }
+
+  /* Top Right Project Menu Compact Mobile Style */
+  .project-menu-btn-text {
+    display: none;
+  }
+  .btn-project-menu .menu-chevron {
+    display: none;
+  }
+  .btn-project-menu {
+    padding: 6px 9px;
+  }
+  .project-dropdown-menu {
+    width: 275px;
+    max-width: calc(100vw - 20px);
+    right: 0;
   }
 
   /* Workspace Layout Shift for Mobile */
@@ -300,17 +334,11 @@
     top: 0;
     z-index: 15;
   }
-  .audio-waveform-canvas {
-    height: 32px;
-  }
-  .timeline-track-headers .track-header:last-child {
-    margin-bottom: 56px;
+  .timeline-headers-content {
+    padding-bottom: 56px;
   }
   .timeline-tracks-content {
     padding-bottom: 56px;
-  }
-  .timeline-tracks-content .timeline-track-row:last-child {
-    margin-bottom: 56px;
   }
   .timeline-scroll-container {
     overflow-x: auto;

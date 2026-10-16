@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <linearGradient id="parchmentBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5ECE0" />
+      <stop offset="50%" stop-color="#EFE2D0" />
+      <stop offset="100%" stop-color="#E2D0BA" />
+    </linearGradient>
+    <radialGradient id="agedVignette" cx="50%" cy="50%" r="75%">
+      <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+      <stop offset="85%" stop-color="#7A5636" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#4E331A" stop-opacity="0.25" />
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#parchmentBg)" />
+  <rect width="1080" height="1920" fill="url(#agedVignette)" />
+</svg>

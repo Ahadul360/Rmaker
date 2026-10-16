@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none';" />
   <title>ReelMaker - Offline Reel Video Generator</title>
   <meta name="description" content="Generate beautiful aesthetic quote & status reel videos offline with Bengali typography, custom music, and doodle backgrounds. Works 100% in browser." />
   <meta name="theme-color" content="#111318" />
@@ -38,7 +38,7 @@
 
       <div class="header-center">
         <!-- Undo / Redo -->
-        <div class="btn-group">
+        <div class="btn-group undo-redo-group" id="group-undo-redo">
           <button id="btn-undo" class="btn-tool" title="Undo (Ctrl+Z)" disabled aria-label="Undo">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
           </button>
@@ -47,7 +47,7 @@
           </button>
         </div>
 
-        <div class="header-sep"></div>
+        <div class="header-sep sep-undo-redo"></div>
 
         <!-- Aspect Ratio Switcher -->
         <div class="ratio-selector-group" role="radiogroup" aria-label="Aspect Ratio">
@@ -69,23 +69,100 @@
           <span class="status-dot dot-green"></span> Offline Ready
         </div>
 
-        <!-- Project Actions -->
-        <button id="btn-new" class="btn-icon" title="New Project" aria-label="New Project">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <button id="btn-open" class="btn-icon" title="Saved Projects & Templates" aria-label="Open Projects">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        </button>
-        <button id="btn-save" class="btn btn-secondary btn-sm" title="Save Project (Ctrl+S)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          <span>Save</span>
-        </button>
+        <!-- Unified Save & Project Menu Dropdown -->
+        <div class="project-menu-wrapper" id="project-menu-container">
+          <button id="btn-project-menu" class="btn btn-primary btn-sm btn-project-menu" title="Project Actions & Export" aria-label="Project Menu" aria-haspopup="true" aria-expanded="false">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span class="project-menu-btn-text">Save / Export</span>
+            <svg class="menu-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
 
-        <!-- Primary Export Action -->
-        <button id="btn-export" class="btn btn-primary btn-sm" title="Export Video File">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <span>Export Video</span>
-        </button>
+          <!-- Dropdown Popover Menu -->
+          <div class="project-dropdown-menu" id="project-dropdown-menu" role="menu" aria-label="Project Actions">
+            <div class="dropdown-header">
+              <span class="dropdown-header-title">Project & Video</span>
+              <span class="save-status-text" id="menu-save-status">Saved locally</span>
+            </div>
+
+            <!-- 1. Save Project -->
+            <button class="dropdown-item" id="menu-item-save" role="menuitem">
+              <div class="dropdown-item-icon icon-save">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Save Project</div>
+                <div class="dropdown-item-desc">Save changes to local browser storage</div>
+              </div>
+              <span class="kbd-shortcut">Ctrl+S</span>
+            </button>
+
+            <!-- 2. Create New Project -->
+            <button class="dropdown-item" id="menu-item-new" role="menuitem">
+              <div class="dropdown-item-icon icon-new">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Create New Project</div>
+                <div class="dropdown-item-desc">Start fresh with a clean canvas</div>
+              </div>
+            </button>
+
+            <!-- 3. Open Saved Projects -->
+            <button class="dropdown-item" id="menu-item-open" role="menuitem">
+              <div class="dropdown-item-icon icon-open">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Open Saved Projects</div>
+                <div class="dropdown-item-desc">Browse local reels and presets</div>
+              </div>
+            </button>
+
+            <div class="dropdown-divider"></div>
+
+            <!-- 4. Import / Export Project JSON -->
+            <label class="dropdown-item dropdown-file-label" id="menu-item-import" role="menuitem">
+              <input type="file" id="menu-input-import-file" accept=".json,application/json" style="display: none;" />
+              <div class="dropdown-item-icon icon-import">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Import Project File</div>
+                <div class="dropdown-item-desc">Load project from .json backup</div>
+              </div>
+            </label>
+
+            <button class="dropdown-item" id="menu-item-export-json" role="menuitem">
+              <div class="dropdown-item-icon icon-backup">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Export Project Backup</div>
+                <div class="dropdown-item-desc">Download project as .json file</div>
+              </div>
+            </button>
+
+            <div class="dropdown-divider"></div>
+
+            <!-- 5. Export Video (MP4) -->
+            <button class="dropdown-item dropdown-item-primary" id="menu-item-export-video" role="menuitem">
+              <div class="dropdown-item-icon icon-video">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <div class="dropdown-item-content">
+                <div class="dropdown-item-title">Export Video (MP4)</div>
+                <div class="dropdown-item-desc">Render full HD reel video file</div>
+              </div>
+              <span class="badge-accent">MP4</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -143,13 +220,30 @@
             <h4>Emoji Stickers</h4>
           </div>
           <div class="panel-body">
-            <div class="form-group">
-              <label>Click an Emoji to Add to Reel:</label>
-              <div class="emoji-picker-grid" id="emoji-grid"></div>
+            <!-- Selected Emoji Layer Top Controls -->
+            <div class="selected-layer-card" id="selected-emoji-card">
+              <div class="selected-layer-header">
+                <span class="selected-layer-badge">Selected Emoji Layer</span>
+                <span class="selected-layer-preview" id="preview-selected-emoji">🥀</span>
+              </div>
+              <div class="form-group" style="margin-bottom: 10px;">
+                <div class="slider-label-row">
+                  <label for="input-emoji-size">Selected Emoji Size:</label>
+                  <span class="slider-value-badge" id="val-emoji-size">64px</span>
+                </div>
+                <input type="range" id="input-emoji-size" min="24" max="180" value="64" />
+              </div>
+              <button class="btn btn-danger btn-sm btn-block" id="btn-delete-emoji-layer" title="Delete this emoji layer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Delete Emoji Layer</span>
+              </button>
             </div>
+
+            <div class="panel-divider"></div>
+
             <div class="form-group">
-              <label for="input-emoji-size">Selected Emoji Size:</label>
-              <input type="range" id="input-emoji-size" min="24" max="160" value="64" />
+              <label class="form-section-title">Add Emoji Sticker:</label>
+              <div class="emoji-picker-grid" id="emoji-grid"></div>
             </div>
           </div>
         </section>
@@ -165,19 +259,39 @@
             <h4>Decorations & Shapes</h4>
           </div>
           <div class="panel-body">
-            <div class="form-group">
-              <label>Click a Decorative Element:</label>
-              <div class="shapes-picker-grid" id="shapes-grid"></div>
+            <!-- Selected Deco / Shape Layer Top Controls -->
+            <div class="selected-layer-card" id="selected-shape-card">
+              <div class="selected-layer-header">
+                <span class="selected-layer-badge">Selected Deco Layer</span>
+                <span class="selected-layer-name" id="label-selected-shape">QuoteMarks</span>
+              </div>
+              <div class="form-row" style="margin-bottom: 10px;">
+                <div class="form-group flex-1">
+                  <label for="input-shape-color">Color:</label>
+                  <div class="color-picker-wrapper">
+                    <input type="color" id="input-shape-color" value="#685B53" />
+                    <span class="color-val-badge" id="val-shape-color">#685B53</span>
+                  </div>
+                </div>
+                <div class="form-group flex-1">
+                  <div class="slider-label-row">
+                    <label for="input-shape-size">Size:</label>
+                    <span class="slider-value-badge" id="val-shape-size">60px</span>
+                  </div>
+                  <input type="range" id="input-shape-size" min="20" max="250" value="60" />
+                </div>
+              </div>
+              <button class="btn btn-danger btn-sm btn-block" id="btn-delete-shape-layer" title="Delete this deco layer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Delete Deco Layer</span>
+              </button>
             </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label for="input-shape-color">Color:</label>
-                <input type="color" id="input-shape-color" value="#685B53" />
-              </div>
-              <div class="form-group flex-1">
-                <label for="input-shape-size">Size (px):</label>
-                <input type="range" id="input-shape-size" min="20" max="250" value="60" />
-              </div>
+
+            <div class="panel-divider"></div>
+
+            <div class="form-group">
+              <label class="form-section-title">Add Decorative Shape / Doodle:</label>
+              <div class="shapes-picker-grid" id="shapes-grid"></div>
             </div>
           </div>
         </section>
@@ -243,6 +357,12 @@
               <select id="select-bundled-audio" class="form-select">
                 <option value="lofi-peace" selected>Lofi Peace (Chill & Calm)</option>
                 <option value="sad-acoustic">Sad Acoustic (Emotional)</option>
+                <option value="cinematic-piano">Cinematic Piano (Inspirational)</option>
+                <option value="deep-ambient">Deep Ambient (Focus & Dreamy)</option>
+                <option value="night-vibes">Night Vibes (Chill Lofi Beat)</option>
+                <option value="uplifting-acoustic">Uplifting Acoustic (Hopeful)</option>
+                <option value="midnight-rain">Midnight Rain (Peaceful & Cozy)</option>
+                <option value="minimal-pulse">Minimal Pulse (Modern & Sleek)</option>
               </select>
             </div>
 
@@ -252,6 +372,21 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 <span>Import Local Audio File (MP3, WAV)</span>
               </label>
+            </div>
+
+            <!-- Active / Imported Audio File Display Card -->
+            <div class="selected-layer-card" id="imported-audio-card" style="display: none;">
+              <div class="selected-layer-header">
+                <div class="selected-layer-badge">
+                  <span class="selected-layer-preview">🎵</span>
+                  <span class="selected-layer-name" id="label-imported-audio-name">audio-file.mp3</span>
+                </div>
+                <span class="audio-type-pill" id="badge-imported-audio-type">Imported File</span>
+              </div>
+              <div class="audio-card-meta">
+                <span id="text-imported-audio-meta">Custom local audio active</span>
+                <button type="button" id="btn-remove-imported-audio" class="btn-text-danger" title="Revert to bundled music">Use Bundled Music</button>
+              </div>
             </div>
 
             <div class="form-group">

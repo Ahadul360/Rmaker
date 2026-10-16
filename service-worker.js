@@ -1,5 +1,5 @@
 /* ReelMaker Service Worker - Offline-first PWA Cache */
-const CACHE_NAME = 'reelmaker-v1.0.6';
+const CACHE_NAME = 'reelmaker-v1.0.14';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -28,6 +28,12 @@ const ASSETS_TO_CACHE = [
   './assets/fonts/OFL.txt',
   './assets/patterns/doodle-hearts.svg',
   './assets/patterns/doodle-stars.svg',
+  './assets/patterns/doodle-butterflies.svg',
+  './assets/patterns/doodle-waves.svg',
+  './assets/patterns/doodle-coffee.svg',
+  './assets/patterns/doodle-galaxy.svg',
+  './assets/patterns/vintage-grid.svg',
+  './assets/patterns/doodle-sunburst.svg',
   './assets/patterns/doodle-music.svg',
   './assets/patterns/doodle-botanical.svg',
   './assets/patterns/doodle-geometric.svg',
@@ -35,11 +41,19 @@ const ASSETS_TO_CACHE = [
   './assets/backgrounds/cream-paper.svg',
   './assets/backgrounds/dark-obsidian.svg',
   './assets/backgrounds/pastel-rose.svg',
+  './assets/backgrounds/midnight-emerald.svg',
+  './assets/backgrounds/vintage-parchment.svg',
+  './assets/backgrounds/velvet-wine.svg',
   './assets/music/lofi-peace-15s.wav',
   './assets/music/sad-acoustic-15s.wav',
+  './assets/music/cinematic-piano-15s.wav',
+  './assets/music/deep-ambient-15s.wav',
+  './assets/music/night-vibes-15s.wav',
+  './assets/music/uplifting-acoustic-15s.wav',
+  './assets/music/midnight-rain-15s.wav',
+  './assets/music/minimal-pulse-15s.wav',
   './assets/icons/icon-192.svg',
-  './assets/icons/icon-512.svg',
-  './workers/export-worker.js'
+  './assets/icons/icon-512.svg'
 ];
 
 self.addEventListener('install', (event) => {
