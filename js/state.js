@@ -30,11 +30,16 @@ class StateManager {
     this.initDefaultProject();
   }
 
+  generateDefaultProjectName() {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `Reel ${randomNum} by Rmaker`;
+  }
+
   initDefaultProject() {
     const defaultTemplate = Presets.templates[0]; // Cream Doodle Reel
     this.project = {
       id: Utils.generateId('proj'),
-      name: 'আমার প্রথম রিল (My First Reel)',
+      name: this.generateDefaultProjectName(),
       version: '1.0.0',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -332,6 +337,7 @@ class StateManager {
     const template = Presets.templates.find(t => t.id === templateId) || Presets.templates[0];
     this.pushUndo(`Apply Template: ${template.title}`);
 
+    this.project.name = template.title || 'Reel Project';
     this.project.aspectRatio = template.aspectRatio || '9:16';
     this.project.width = Presets.aspectRatios[this.project.aspectRatio].width;
     this.project.height = Presets.aspectRatios[this.project.aspectRatio].height;
@@ -344,6 +350,7 @@ class StateManager {
 
     this.currentTime = 0;
     this.selectElement(null);
+    this.emit('durationChange', this.project.duration);
     this.emit('projectLoaded', this.project);
     this.emit('projectChange', { project: this.project, type: 'template' });
     this.emit('stateRenderNeeded');

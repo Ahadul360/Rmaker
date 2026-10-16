@@ -49,7 +49,12 @@ class ReelApp {
     // Check if there is an existing project in storage, or load default
     const savedProjects = await Storage.getAllProjects();
     if (savedProjects.length > 0) {
-      State.loadProject(savedProjects[0]);
+      const proj = savedProjects[0];
+      if (proj && (!proj.name || proj.name === 'আমার প্রথম রিল (My First Reel)' || proj.name === 'আমার প্রথম রিল' || proj.name === 'Untitled Reel')) {
+        proj.name = State.generateDefaultProjectName();
+        await Storage.saveProject(proj);
+      }
+      State.loadProject(proj);
     } else {
       State.initDefaultProject();
       await Storage.saveProject(State.project);
@@ -327,9 +332,10 @@ class ReelApp {
 
     // Responsive Top Title Sync
     State.on('projectLoaded', (proj) => {
-      inputTitle.value = proj.name;
+      inputTitle.value = proj.name || 'Reel Project';
       ratioBtns.forEach(b => b.classList.toggle('active', b.dataset.ratio === proj.aspectRatio));
       this.resizeCanvas();
+      this.renderNeeded = true;
       if (proj.audio && proj.audio.enabled) {
         AudioSys.loadTrack(proj.audio);
       }

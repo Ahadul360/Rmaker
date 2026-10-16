@@ -288,6 +288,60 @@ class AudioEngine {
       Utils.showToast(`Failed to import audio: ${err.message}`, 'error');
     }
   }
+
+  /**
+   * Fast offline audio rendering for WebCodecs MP4/WebM muxing
+   */
+  async renderOfflineAudio(duration, sampleRate = 44100) {
+    if (!this.currentBuffer || !State.project.audio || !State.project.audio.enabled || State.project.audio.muted) {
+      return null;
+    }
+    const audio = State.project.audio;
+    const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OfflineCtx) return null;
+
+    const totalSamples = Math.ceil(duration * sampleRate);
+    if (totalSamples <= 0) return null;
+
+    try {
+      const offlineCtx = new OfflineCtx(2, totalSamples, sampleRate);
+      const source = offlineCtx.createBufferSource();
+      source.buffer = this.currentBuffer;
+
+      const bufferDuration = this.currentBuffer.duration;
+      const trimStart = Utils.clamp(audio.trimStart || 0, 0, bufferDuration);
+      const trimEnd = Math.min(bufferDuration, audio.trimEnd || bufferDuration);
+
+      source.loop = audio.loop !== undefined ? !!audio.loop : true;
+      source.loopStart = trimStart;
+      source.loopEnd = trimEnd;
+
+      const gainNode = offlineCtx.createGain();
+      const vol = audio.volume !== undefined ? audio.volume : 0.85;
+      gainNode.gain.setValueAtTime(vol, 0);
+
+      if (audio.fadeIn && audio.fadeIn > 0) {
+        gainNode.gain.setValueAtTime(0, 0);
+        gainNode.gain.linearRampToValueAtTime(vol, Math.min(audio.fadeIn, duration));
+      }
+
+      if (audio.fadeOut && audio.fadeOut > 0) {
+        const fadeStart = Math.max(0, duration - audio.fadeOut);
+        gainNode.gain.setValueAtTime(vol, fadeStart);
+        gainNode.gain.linearRampToValueAtTime(0, duration);
+      }
+
+      source.connect(gainNode);
+      gainNode.connect(offlineCtx.destination);
+      source.start(0, trimStart, duration);
+
+      const renderedBuffer = await offlineCtx.startRendering();
+      return renderedBuffer;
+    } catch (e) {
+      console.warn('renderOfflineAudio failed:', e);
+      return null;
+    }
+  }
 }
 
 export const AudioSys = new AudioEngine();

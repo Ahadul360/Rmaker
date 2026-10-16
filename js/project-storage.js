@@ -229,34 +229,52 @@ class ProjectStorage {
 
         if (elem.type === 'text') {
           safeElem.text = String(elem.text || '').slice(0, 5000);
-          safeElem.fontSize = Utils.clamp(Number(elem.fontSize) || 36, 8, 200);
+          safeElem.fontSize = Utils.clamp(Number(elem.fontSize) || 48, 8, 200);
           safeElem.fontFamily = String(elem.fontFamily || 'Hind Siliguri').slice(0, 80);
           safeElem.fontWeight = String(elem.fontWeight || 'normal').slice(0, 20);
+          safeElem.fontStyle = String(elem.fontStyle || 'normal').slice(0, 20);
           safeElem.color = String(elem.color || '#2D2926').slice(0, 30);
-          safeElem.align = ['left', 'center', 'right'].includes(elem.align) ? elem.align : 'center';
-          safeElem.lineHeight = Utils.clamp(Number(elem.lineHeight) || 1.3, 0.8, 3.0);
+          safeElem.textAlign = ['left', 'center', 'right'].includes(elem.textAlign || elem.align) ? (elem.textAlign || elem.align) : 'center';
+          safeElem.lineHeight = Utils.clamp(Number(elem.lineHeight) || 1.45, 0.8, 3.0);
           safeElem.letterSpacing = Utils.clamp(Number(elem.letterSpacing) || 0, -5, 20);
-          safeElem.shadow = !!elem.shadow;
-          safeElem.shadowColor = String(elem.shadowColor || 'rgba(0,0,0,0.5)').slice(0, 40);
-          safeElem.shadowBlur = Utils.clamp(Number(elem.shadowBlur) || 8, 0, 50);
-          safeElem.shadowOffsetX = Utils.clamp(Number(elem.shadowOffsetX) || 2, -50, 50);
-          safeElem.shadowOffsetY = Utils.clamp(Number(elem.shadowOffsetY) || 3, -50, 50);
-          safeElem.stroke = !!elem.stroke;
-          safeElem.strokeColor = String(elem.strokeColor || '#000000').slice(0, 30);
-          safeElem.strokeWidth = Utils.clamp(Number(elem.strokeWidth) || 2, 0, 30);
-          safeElem.bgBadge = !!elem.bgBadge;
-          safeElem.badgeColor = String(elem.badgeColor || 'rgba(0,0,0,0.5)').slice(0, 40);
-          safeElem.badgeRadius = Utils.clamp(Number(elem.badgeRadius) || 8, 0, 50);
-          safeElem.badgePadding = Utils.clamp(Number(elem.badgePadding) || 10, 0, 50);
+          safeElem.width = Utils.clamp(Number.isFinite(Number(elem.width)) ? Number(elem.width) : 0.82, 0.1, 1.0);
+          
+          if (elem.shadow && typeof elem.shadow === 'object') {
+            safeElem.shadow = {
+              color: String(elem.shadow.color || 'rgba(0,0,0,0.1)').slice(0, 40),
+              blur: Utils.clamp(Number(elem.shadow.blur) || 0, 0, 50),
+              offsetX: Utils.clamp(Number(elem.shadow.offsetX) || 0, -50, 50),
+              offsetY: Utils.clamp(Number(elem.shadow.offsetY) || 0, -50, 50)
+            };
+          } else {
+            safeElem.shadow = { color: 'rgba(0,0,0,0)', blur: 0, offsetX: 0, offsetY: 0 };
+          }
+
+          if (elem.stroke && typeof elem.stroke === 'object') {
+            safeElem.stroke = {
+              color: String(elem.stroke.color || '#ffffff').slice(0, 30),
+              width: Utils.clamp(Number(elem.stroke.width) || 0, 0, 30)
+            };
+          } else {
+            safeElem.stroke = { color: '#ffffff', width: 0 };
+          }
+
+          const badge = elem.backgroundBadge || {};
+          safeElem.backgroundBadge = {
+            enabled: !!badge.enabled,
+            color: String(badge.color || 'rgba(255,255,255,0.7)').slice(0, 40),
+            padding: Utils.clamp(Number(badge.padding) || 14, 0, 60),
+            borderRadius: Utils.clamp(Number(badge.borderRadius) || 12, 0, 60)
+          };
         } else if (elem.type === 'emoji') {
           safeElem.emoji = String(elem.emoji || '✨').slice(0, 10);
-          safeElem.size = Utils.clamp(Number(elem.size) || 72, 16, 300);
+          safeElem.size = Utils.clamp(Number(elem.size) || 64, 16, 300);
         } else if (elem.type === 'shape') {
-          safeElem.shape = String(elem.shape || 'star').slice(0, 50);
-          safeElem.size = Utils.clamp(Number(elem.size) || 64, 10, 300);
-          safeElem.color = String(elem.color || '#2D2926').slice(0, 30);
-          safeElem.fill = !!elem.fill;
-          safeElem.strokeWidth = Utils.clamp(Number(elem.strokeWidth) || 3, 1, 30);
+          safeElem.shape = String(elem.shape || 'quoteMarks').slice(0, 50);
+          safeElem.width = Utils.clamp(Number(elem.width || elem.size) || 50, 10, 500);
+          safeElem.height = Utils.clamp(Number(elem.height || elem.size) || 50, 10, 500);
+          safeElem.color = String(elem.color || '#685B53').slice(0, 30);
+          safeElem.opacity = Utils.clamp(Number.isFinite(Number(elem.opacity)) ? Number(elem.opacity) : 0.8, 0, 1);
         }
 
         validElements.push(safeElem);
@@ -267,7 +285,6 @@ class ProjectStorage {
     const bg = clean.background && typeof clean.background === 'object' ? clean.background : {};
     let safeImageSrc = null;
     if (typeof bg.imageSrc === 'string') {
-      // Only allow safe data URI or relative assets, strictly reject javascript: or dangerous schemes
       if (bg.imageSrc.startsWith('data:image/') || bg.imageSrc.startsWith('blob:') || bg.imageSrc.startsWith('./assets/') || bg.imageSrc.startsWith('assets/')) {
         safeImageSrc = bg.imageSrc;
       }
@@ -275,13 +292,14 @@ class ProjectStorage {
 
     const safeBg = {
       type: typeof bg.type === 'string' ? bg.type.slice(0, 50) : 'cream-paper',
-      color: typeof bg.color === 'string' ? bg.color.slice(0, 30) : '#F7F4EB',
+      color: typeof bg.color === 'string' ? bg.color.slice(0, 30) : '#F7F1E5',
       gradient: Array.isArray(bg.gradient) ? bg.gradient.slice(0, 5).map(c => String(c).slice(0, 30)) : null,
       gradientAngle: Number.isFinite(Number(bg.gradientAngle)) ? Number(bg.gradientAngle) % 360 : 135,
       pattern: typeof bg.pattern === 'string' ? bg.pattern.slice(0, 60) : 'none',
+      patternColor: typeof bg.patternColor === 'string' ? bg.patternColor.slice(0, 30) : '#685B53',
       patternOpacity: Utils.clamp(Number.isFinite(Number(bg.patternOpacity)) ? Number(bg.patternOpacity) : 0.35, 0, 1),
       patternScale: Utils.clamp(Number.isFinite(Number(bg.patternScale)) ? Number(bg.patternScale) : 1.0, 0.2, 5),
-      patternBlend: typeof bg.patternBlend === 'string' ? bg.patternBlend.slice(0, 30) : 'source-over',
+      patternBlend: typeof bg.patternBlend === 'string' ? bg.patternBlend.slice(0, 30) : 'multiply',
       patternRotation: Number.isFinite(Number(bg.patternRotation)) ? Number(bg.patternRotation) % 360 : 0,
       imageSrc: safeImageSrc,
       imageFit: ['cover', 'contain'].includes(bg.imageFit) ? bg.imageFit : 'cover',
@@ -317,12 +335,21 @@ class ProjectStorage {
     const social = clean.socialHandle && typeof clean.socialHandle === 'object' ? clean.socialHandle : {};
     const safeSocial = {
       enabled: !!social.enabled,
-      platform: ['tiktok', 'instagram', 'facebook', 'youtube', 'generic'].includes(social.platform) ? social.platform : 'tiktok',
-      handle: typeof social.handle === 'string' ? social.handle.slice(0, 60) : '@yourhandle',
-      fontSize: Utils.clamp(Number(social.fontSize) || 20, 10, 60),
-      color: typeof social.color === 'string' ? social.color.slice(0, 30) : 'rgba(45, 41, 38, 0.75)',
+      text: typeof (social.text || social.handle) === 'string' ? String(social.text || social.handle).slice(0, 60) : '@yourname',
+      platform: ['tiktok', 'instagram', 'facebook', 'youtube', 'none', 'generic'].includes(social.platform) ? social.platform : 'tiktok',
+      positionPreset: ['bottom-center', 'bottom-left', 'bottom-right'].includes(social.positionPreset) ? social.positionPreset : 'bottom-center',
       x: Utils.clamp(Number.isFinite(Number(social.x)) ? Number(social.x) : 0.5, 0, 1),
       y: Utils.clamp(Number.isFinite(Number(social.y)) ? Number(social.y) : 0.88, 0, 1),
+      fontFamily: String(social.fontFamily || 'Outfit').slice(0, 50),
+      fontSize: Utils.clamp(Number(social.fontSize) || 26, 10, 60),
+      color: typeof social.color === 'string' ? social.color.slice(0, 30) : '#685B53',
+      backgroundBadge: {
+        enabled: !!(social.backgroundBadge && social.backgroundBadge.enabled),
+        color: String((social.backgroundBadge && social.backgroundBadge.color) || 'rgba(255, 255, 255, 0.65)').slice(0, 40),
+        padding: Utils.clamp(Number(social.backgroundBadge && social.backgroundBadge.padding) || 10, 0, 40),
+        borderRadius: Utils.clamp(Number(social.backgroundBadge && social.backgroundBadge.borderRadius) || 20, 0, 40)
+      },
+      opacity: Utils.clamp(Number.isFinite(Number(social.opacity)) ? Number(social.opacity) : 0.85, 0, 1),
       startTime: 0,
       endTime: duration,
       alwaysVisible: true

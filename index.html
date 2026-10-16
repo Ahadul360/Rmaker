@@ -28,7 +28,7 @@
         </a>
 
         <div class="project-title-wrapper">
-          <input type="text" id="input-project-title" class="project-title-input" value="আমার প্রথম রিল" title="Rename Project" aria-label="Project Title" />
+          <input type="text" id="input-project-title" class="project-title-input" value="Reel by Rmaker" placeholder="Reel by Rmaker" title="Rename Project" aria-label="Project Title" />
         </div>
 
         <div class="save-badge" id="save-status-badge">
@@ -126,40 +126,16 @@
 
             <div class="dropdown-divider"></div>
 
-            <!-- 4. Import / Export Project JSON -->
-            <label class="dropdown-item dropdown-file-label" id="menu-item-import" role="menuitem">
-              <input type="file" id="menu-input-import-file" accept=".json,application/json" style="display: none;" />
-              <div class="dropdown-item-icon icon-import">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              </div>
-              <div class="dropdown-item-content">
-                <div class="dropdown-item-title">Import Project File</div>
-                <div class="dropdown-item-desc">Load project from .json backup</div>
-              </div>
-            </label>
-
-            <button class="dropdown-item" id="menu-item-export-json" role="menuitem">
-              <div class="dropdown-item-icon icon-backup">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              </div>
-              <div class="dropdown-item-content">
-                <div class="dropdown-item-title">Export Project Backup</div>
-                <div class="dropdown-item-desc">Download project as .json file</div>
-              </div>
-            </button>
-
-            <div class="dropdown-divider"></div>
-
-            <!-- 5. Export Video (MP4) -->
+            <!-- Export Video -->
             <button class="dropdown-item dropdown-item-primary" id="menu-item-export-video" role="menuitem">
               <div class="dropdown-item-icon icon-video">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
               <div class="dropdown-item-content">
-                <div class="dropdown-item-title">Export Video (MP4)</div>
-                <div class="dropdown-item-desc">Render full HD reel video file</div>
+                <div class="dropdown-item-title">Export Video</div>
+                <div class="dropdown-item-desc">Render reel video (MP4 / WebM)</div>
               </div>
-              <span class="badge-accent">MP4</span>
+              <span class="badge-accent">Export</span>
             </button>
           </div>
         </div>

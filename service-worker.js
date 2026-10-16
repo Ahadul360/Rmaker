@@ -1,5 +1,5 @@
 /* ReelMaker Service Worker - Offline-first PWA Cache */
-const CACHE_NAME = 'reelmaker-v1.0.14';
+const CACHE_NAME = 'reelmaker-v1.0.16';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -18,6 +18,8 @@ const ASSETS_TO_CACHE = [
   './js/background-editor.js',
   './js/timeline.js',
   './js/audio-engine.js',
+  './js/mp4-muxer.js',
+  './js/fix-webm-duration.js',
   './js/video-exporter.js',
   './js/app.js',
   './assets/fonts/HindSiliguri-Regular.ttf',

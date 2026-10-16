@@ -233,8 +233,15 @@ export class Timeline {
     // React to State Events
     State.on('timeChange', ({ time }) => this.updatePlayhead(time));
     State.on('durationChange', (duration) => {
-      this.inputDuration.value = duration;
-      this.tcTotal.textContent = Utils.formatTime(duration);
+      if (this.inputDuration) this.inputDuration.value = duration;
+      if (this.tcTotal) this.tcTotal.textContent = Utils.formatTime(duration);
+      this.render();
+    });
+    State.on('projectLoaded', (proj) => {
+      const dur = proj.duration || 15;
+      if (this.inputDuration) this.inputDuration.value = dur;
+      if (this.tcTotal) this.tcTotal.textContent = Utils.formatTime(dur);
+      this.updatePlayhead(0);
       this.render();
     });
     State.on('playbackChange', (isPlaying) => this.updatePlayIcon(isPlaying));

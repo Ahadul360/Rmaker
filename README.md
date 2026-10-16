@@ -97,7 +97,7 @@ The project strictly adheres to a modular, dependency-free architecture:
 
 ---
 
-## 🎨 10 Included Offline Templates
+## 🎨 20 Included Offline Templates
 
 1. **Cream Beige Doodle (TikTok Style)**: The quintessential viral quote reel with warm cream paper, doodle hearts, and centered Bengali poetry.
 2. **Sad Quote Reel (নীরব স্মৃতি)**: Contemplative emotional quote with sad acoustic chords, dark cream canvas, and celestial star doodles.
@@ -109,6 +109,16 @@ The project strictly adheres to a modular, dependency-free architecture:
 8. **English Quote Reel (Timeless Wisdom)**: Clean international English layout with Outfit typography.
 9. **Emoji Reaction Reel (মন ভালো করার গান)**: Large animated emoji with music note doodles and pill text badges.
 10. **Blank Canvas (কাস্টম প্রজেক্ট)**: Clean cream slate for full creative freedom.
+11. **Midnight Emerald (প্রকৃতির নির্জনতা)**: Lush dark forest green canvas with botanical doodles, mint highlights and calming deep ambient audio.
+12. **Coffee & Cozy Café (এক কাপ কফি ও স্মৃতি)**: Warm roasted café beige aesthetic with charming coffee doodles and calm chill vibes.
+13. **Velvet Wine & Poetry (গোধূলির কবিতা)**: Luxurious velvet wine canvas with soft starry glow and deep emotional Bengali poetry.
+14. **Celestial Galaxy (তারার মেলা)**: Cosmic galaxy doodles with neon celestial blue starlight typography and inspiring status.
+15. **Vintage Notebook Grid (স্মৃতির ডায়রি)**: Aesthetic antique parchment notebook with classic grid pattern and nostalgic diary quotes.
+16. **Sunburst Golden Hour (সোনালী বিকেল)**: Warm terracotta golden hour vibes with radiant sunburst doodles and uplifting melody.
+17. **Rainy Monsoon Mood (বৃষ্টির গান)**: Moody slate blue canvas with gentle wave ripples, rain drops and soothing ambient audio.
+18. **Flutters & Butterflies (নতুন স্বপ্নের ডানা)**: Delicate blush pink paper with graceful butterfly flutters and motivating aesthetic.
+19. **Square 1:1 Quote Card (ইনস্টাগ্রাম কোট)**: Classic 1:1 square post reel with elegant paper dots, clean serif and piano melody.
+20. **Portrait 4:5 Aesthetic Post (সৌন্দর্যের গল্প)**: Modern 4:5 portrait aspect ratio optimized for Instagram feed reels and status.
 
 ---
 

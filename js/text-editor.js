@@ -382,10 +382,19 @@ export class TextEditor {
 
     // React to selection changes
     State.on('selectionChange', (id) => this.loadSelectedElement(id));
+    State.on('projectLoaded', () => {
+      this.loadSelectedElement(State.selectedElementId);
+    });
     State.on('projectChange', () => {
       if (this.activeElement) {
         const found = State.project.elements.find(e => e.id === this.activeElement.id);
-        if (found) this.syncUI(found);
+        if (found) {
+          this.syncUI(found);
+        } else {
+          this.loadSelectedElement(State.selectedElementId);
+        }
+      } else {
+        this.loadSelectedElement(State.selectedElementId);
       }
     });
 
