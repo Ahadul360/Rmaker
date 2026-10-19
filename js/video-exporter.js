@@ -241,6 +241,31 @@ export class VideoExporter {
     this.exportModal.querySelector('#export-complete-view').style.display = 'none';
   }
 
+  setupExportCanvas(w, h) {
+    if (!this.exportCanvas) {
+      this.exportCanvas = document.createElement('canvas');
+      this.exportCanvas.id = 'reelmaker-export-canvas';
+      // In iOS 18 WebKit / Mobile Safari, unattached canvases suspend their GPU backing store.
+      // Keeping it attached offscreen ensures VideoFrame and captureStream function without failure.
+      this.exportCanvas.style.cssText = 'position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-9999;';
+      document.body.appendChild(this.exportCanvas);
+    }
+    this.exportCanvas.width = w;
+    this.exportCanvas.height = h;
+    this.exportRenderer = new CanvasRenderer(this.exportCanvas);
+    return this.exportCanvas;
+  }
+
+  cleanupExportCanvas() {
+    if (this.exportCanvas && this.exportCanvas.parentNode) {
+      try {
+        this.exportCanvas.parentNode.removeChild(this.exportCanvas);
+      } catch (e) {}
+    }
+    this.exportCanvas = null;
+    this.exportRenderer = null;
+  }
+
   showCompleteView(blobUrl) {
     this.exportModal.querySelector('#export-config-view').style.display = 'none';
     this.exportModal.querySelector('#export-progress-view').style.display = 'none';
@@ -250,7 +275,18 @@ export class VideoExporter {
     const isMp4 = this.resultFormat === 'mp4';
     const ext = isMp4 ? '.mp4' : '.webm';
     completeView.querySelector('#export-complete-title').textContent = `Reel Video Ready (${ext})!`;
-    completeView.querySelector('#btn-download-label').textContent = isMp4 ? 'Download MP4 Video' : 'Download WebM Video';
+
+    // Detect if Web Share API with files is available (iOS Safari Save to Photos)
+    const canShareFiles = typeof navigator !== 'undefined' &&
+      typeof navigator.canShare === 'function' &&
+      typeof File !== 'undefined';
+
+    const downloadLabel = completeView.querySelector('#btn-download-label');
+    if (downloadLabel) {
+      downloadLabel.textContent = canShareFiles
+        ? 'Save to Photos / Share Video'
+        : (isMp4 ? 'Download MP4 Video' : 'Download WebM Video');
+    }
 
     const videoEl = completeView.querySelector('#export-video-preview');
     videoEl.src = blobUrl;
@@ -260,7 +296,8 @@ export class VideoExporter {
   async startExport(options) {
     if (this.isExporting) return;
 
-    const { format = 'mp4' } = options;
+    const { format = 'mp4', includeAudio = true } = options;
+    const project = State.project;
     const hasWebCodecs = typeof window !== 'undefined' &&
       typeof window.VideoEncoder !== 'undefined' &&
       typeof window.VideoFrame !== 'undefined';
@@ -269,6 +306,21 @@ export class VideoExporter {
     if (format === 'mp4' && hasWebCodecs) {
       const isAvcSupported = await this.checkAvcSupport(options);
       if (isAvcSupported) {
+        // In iOS 18 Safari, AudioEncoder is undefined.
+        // If an audio track is enabled, check if MediaRecorder natively supports MP4 with AAC audio.
+        const audioRequested = includeAudio && project.audio && project.audio.enabled && !project.audio.muted;
+        const hasAudioEncoder = typeof window.AudioEncoder !== 'undefined';
+
+        if (audioRequested && !hasAudioEncoder) {
+          const supportsMp4Recorder = typeof MediaRecorder !== 'undefined' &&
+            (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a.40.2') ||
+             MediaRecorder.isTypeSupported('video/mp4'));
+          if (supportsMp4Recorder) {
+            console.log('[Export] AudioEncoder not present, but native MP4 MediaRecorder supported. Using MediaRecorder for MP4 with audio.');
+            return this.exportWithMediaRecorder(options);
+          }
+        }
+
         return this.exportWithWebCodecs(options);
       }
     }
@@ -286,7 +338,15 @@ export class VideoExporter {
     const exportW = Math.round(baseWidth * scale);
     const exportH = Math.round(baseHeight * scale);
 
-    const avcProfiles = ['avc1.42001f', 'avc1.4d002a', 'avc1.640028'];
+    // Order matters: check Level 4.2 / Level 4.0 first (required for 1080p hardware encoding on iOS Safari)
+    const avcProfiles = [
+      'avc1.4d002a', // Main Profile, Level 4.2 (Standard Apple VideoToolbox HW)
+      'avc1.640028', // High Profile, Level 4.0
+      'avc1.420028', // Baseline Profile, Level 4.0
+      'avc1.4d0028', // Main Profile, Level 4.0
+      'avc1.42001f', // Baseline Profile, Level 3.1
+      'avc1.42E01E'  // Constrained Baseline
+    ];
     for (const codec of avcProfiles) {
       try {
         const res = await VideoEncoder.isConfigSupported({
@@ -321,13 +381,10 @@ export class VideoExporter {
     const exportH = Math.round(baseHeight * scale);
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
 
-    const avcCodec = await this.checkAvcSupport(options) || 'avc1.42001f';
+    const avcCodec = await this.checkAvcSupport(options) || 'avc1.4d002a';
 
-    // Prepare offscreen canvas
-    this.exportCanvas = document.createElement('canvas');
-    this.exportCanvas.width = exportW;
-    this.exportCanvas.height = exportH;
-    this.exportRenderer = new CanvasRenderer(this.exportCanvas);
+    // Prepare DOM-attached offscreen canvas (prevents iOS WebKit GPU buffer suspension)
+    this.setupExportCanvas(exportW, exportH);
 
     this.showProgressView();
     this.isExporting = true;
@@ -367,7 +424,7 @@ export class VideoExporter {
         }
       }
 
-      // 2. Initialize MP4 Muxer with FastStart for social media streaming
+      // 2. Initialize MP4 Muxer with FastStart & offset first timestamp behavior
       const muxer = new Mp4Muxer.Muxer({
         target: new Mp4Muxer.ArrayBufferTarget(),
         video: {
@@ -377,12 +434,22 @@ export class VideoExporter {
           frameRate: fps
         },
         audio: audioTrackConfig,
-        fastStart: 'in-memory'
+        fastStart: 'in-memory',
+        firstTimestampBehavior: 'offset'
       });
 
-      // 3. Initialize VideoEncoder
+      // 3. Initialize VideoEncoder with monotonic timestamp enforcement
+      let lastVideoTimestampUs = -1;
       const videoEncoder = new VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        output: (chunk, meta) => {
+          let ts = chunk.timestamp;
+          if (ts < 0) ts = 0;
+          if (ts <= lastVideoTimestampUs) {
+            ts = lastVideoTimestampUs + 1;
+          }
+          lastVideoTimestampUs = ts;
+          muxer.addVideoChunk(chunk, meta, ts);
+        },
         error: (err) => console.error('[VideoEncoder error]', err)
       });
 
@@ -394,7 +461,7 @@ export class VideoExporter {
         framerate: fps
       });
 
-      // 4. Encode Audio (if enabled)
+      // 4. Encode Audio (if enabled and AudioEncoder supported)
       let audioEncoder = null;
       if (canEncodeAudio) {
         const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
@@ -443,6 +510,7 @@ export class VideoExporter {
       const totalFrames = Math.ceil(duration * fps);
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
         if (!this.isExporting || this.abortController.signal.aborted) {
+          this.cleanupExportCanvas();
           return;
         }
 
@@ -470,6 +538,8 @@ export class VideoExporter {
       await videoEncoder.flush();
       muxer.finalize();
 
+      this.cleanupExportCanvas();
+
       this.resultBlob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
       this.resultUrl = URL.createObjectURL(this.resultBlob);
       this.isExporting = false;
@@ -478,6 +548,7 @@ export class VideoExporter {
       Utils.showToast('Reel video exported in MP4 format (Social Media Ready)!', 'success');
     } catch (err) {
       console.error('WebCodecs export failed:', err);
+      this.cleanupExportCanvas();
       // If WebCodecs failed unexpectedly, fallback to MediaRecorder
       if (this.isExporting && !this.abortController.signal.aborted) {
         console.warn('Falling back to MediaRecorder...');
@@ -509,6 +580,8 @@ export class VideoExporter {
 
     if (format === 'mp4') {
       const mp4Types = [
+        'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+        'video/mp4;codecs=avc1.420028,mp4a.40.2',
         'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
         'video/mp4;codecs=avc1',
         'video/mp4'
@@ -520,7 +593,6 @@ export class VideoExporter {
         }
       }
       if (!mimeType) {
-        // Fall back to WebM if browser cannot record MP4 directly via MediaRecorder
         targetFormat = 'webm';
         Utils.showToast('Your browser does not support native MP4 recording. Exporting as WebM with duration.', 'info');
       }
@@ -545,10 +617,8 @@ export class VideoExporter {
       return;
     }
 
-    this.exportCanvas = document.createElement('canvas');
-    this.exportCanvas.width = exportW;
-    this.exportCanvas.height = exportH;
-    this.exportRenderer = new CanvasRenderer(this.exportCanvas);
+    // Attach to DOM so captureStream works reliably in iOS WebKit / Safari
+    this.setupExportCanvas(exportW, exportH);
 
     this.showProgressView();
     this.isExporting = true;
@@ -602,6 +672,7 @@ export class VideoExporter {
 
       const renderLoop = async () => {
         if (!this.isExporting || this.abortController.signal.aborted) {
+          this.cleanupExportCanvas();
           return;
         }
 
@@ -627,6 +698,7 @@ export class VideoExporter {
       renderLoop();
     } catch (err) {
       console.error('MediaRecorder export failed:', err);
+      this.cleanupExportCanvas();
       this.cancelExport();
       Utils.showToast(`Export failed: ${err.message}`, 'error');
     }
@@ -654,12 +726,16 @@ export class VideoExporter {
           this.resultBlob = rawBlob;
         }
 
+        this.cleanupExportCanvas();
+
         this.resultUrl = URL.createObjectURL(this.resultBlob);
         this.isExporting = false;
         this.showCompleteView(this.resultUrl);
         Utils.showToast(`Reel video ready in ${targetFormat.toUpperCase()} format!`, 'success');
       };
       this.mediaRecorder.stop();
+    } else {
+      this.cleanupExportCanvas();
     }
   }
 
@@ -681,27 +757,51 @@ export class VideoExporter {
       } catch (e) {}
     }
     AudioSys.stop();
+    this.cleanupExportCanvas();
     this.recordedChunks = [];
     this.showConfigView();
     Utils.showToast('Export cancelled.', 'info');
   }
 
-  downloadExportedVideo() {
+  async downloadExportedVideo() {
     if (!this.resultBlob || !this.resultUrl) return;
 
     const isMp4 = this.resultFormat === 'mp4';
     const ext = isMp4 ? 'mp4' : 'webm';
+    const mimeType = isMp4 ? 'video/mp4' : 'video/webm';
     const safeName = (State.project.name || 'reel').replace(/[^a-z0-9_\-\u0980-\u09FF]/gi, '_');
     const filename = `${safeName}_${Date.now()}.${ext}`;
 
+    const videoFile = new File([this.resultBlob], filename, { type: mimeType });
+
+    // 1. Web Share API (Primary for iOS Safari / Mobile - lets user "Save Video" to Camera Roll / Photos)
+    if (navigator.canShare && navigator.canShare({ files: [videoFile] })) {
+      try {
+        await navigator.share({
+          files: [videoFile],
+          title: State.project.name || 'Reel Video',
+          text: 'Created with ReelMaker'
+        });
+        Utils.showToast('Video saved / shared successfully!', 'success');
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled the native share sheet
+        }
+        console.warn('Web Share failed, falling back to direct download:', err);
+      }
+    }
+
+    // 2. Fallback to standard anchor download (Desktop & browsers without Web Share)
     const a = document.createElement('a');
     a.href = this.resultUrl;
     a.download = filename;
+    a.target = '_blank';
     document.body.appendChild(a);
     a.click();
-    a.remove();
+    setTimeout(() => a.remove(), 150);
 
-    Utils.showToast(`Downloaded as ${filename}`, 'success');
+    Utils.showToast(`Saved as ${filename}`, 'success');
   }
 }
 

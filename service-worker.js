@@ -1,5 +1,5 @@
 /* ReelMaker Service Worker - Offline-first PWA Cache */
-const CACHE_NAME = 'reelmaker-v1.0.19';
+const CACHE_NAME = 'reelmaker-v2.1.1';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -88,7 +88,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((name) => {
           if (name !== CACHE_NAME) {
-            console.log(`[ServiceWorker] Removing old cache: ${name}`);
+            console.log(`[ServiceWorker] Purging old cache: ${name}`);
             return caches.delete(name);
           }
         })
@@ -100,35 +100,61 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // Ignore non-GET requests and internal schemes like blob/data
+  // Ignore non-GET requests and internal browser schemes
   if (event.request.method !== 'GET' || requestUrl.protocol.startsWith('chrome-extension')) {
     return;
   }
 
-  // Cache-first strategy for app shell and bundled assets
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  const urlPath = requestUrl.pathname;
+  const isCodeAsset = urlPath.endsWith('.js') ||
+                      urlPath.endsWith('.css') ||
+                      urlPath.endsWith('.html') ||
+                      urlPath.endsWith('manifest.json') ||
+                      urlPath === '/' ||
+                      urlPath.endsWith('/');
 
-      return fetch(event.request).then((networkResponse) => {
-        // Cache valid same-origin responses
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
+  if (isCodeAsset) {
+    // Network-First with Cache Fallback for code assets
+    // Ensures iPhone 16 Pro Max and all devices immediately receive latest scripts without stale cache locks
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
+              return caches.match('./index.html');
+            }
           });
+        })
+    );
+  } else {
+    // Cache-First with Network Fallback for immutable/heavy assets (fonts, audio, icons, patterns)
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return networkResponse;
-      }).catch(() => {
-        // Fallback for HTML navigation requests when completely offline
-        if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
-        }
-      });
-    })
-  );
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        });
+      })
+    );
+  }
 });
 
 self.addEventListener('message', (event) => {

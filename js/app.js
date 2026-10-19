@@ -1374,10 +1374,20 @@ class ReelApp {
           if (offlineIndicator) {
             offlineIndicator.innerHTML = `<span class="status-dot dot-green"></span> Offline Ready`;
           }
+          // Prompt immediate check for latest worker version (ensures iOS Safari / PWA receives updates)
+          reg.update().catch(() => {});
         })
         .catch((err) => {
           console.warn('[ServiceWorker] Registration failed:', err);
         });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
   }
 }

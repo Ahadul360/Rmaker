@@ -361,16 +361,57 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
+  .timeline-controls-left {
+    gap: 6px;
+  }
   .timeline-timecode {
-    font-size: 11px;
-    padding: 3px 6px;
+    font-size: 10px;
+    padding: 2px 5px;
+    gap: 2px;
+    letter-spacing: -0.2px;
+    border-radius: 4px;
+    min-height: 22px;
+    line-height: 1.15;
+  }
+  .timeline-timecode span {
+    font-size: 10px;
   }
   .timeline-duration-field label {
     display: none;
   }
   .timeline-duration-field input {
-    width: 42px;
-    font-size: 11px;
+    width: 38px;
+    font-size: 10.5px;
+    padding: 2px 4px;
+  }
+
+  @media (max-width: 480px) {
+    .timeline-header-bar {
+      padding: 0 6px;
+    }
+    .timeline-controls-left {
+      gap: 4px;
+    }
+    .timeline-controls-right {
+      gap: 5px;
+    }
+    .timeline-timecode {
+      font-size: 9px;
+      padding: 1.5px 4px;
+      gap: 1.5px;
+      letter-spacing: -0.35px;
+      border-radius: 3px;
+      min-height: 19px;
+      line-height: 1.15;
+    }
+    .timeline-timecode span {
+      font-size: 9px;
+    }
+    .timeline-duration-field input {
+      width: 34px;
+      font-size: 9.5px;
+      padding: 1px 3px;
+    }
   }
 
   /* Touch-friendly Tap Targets */

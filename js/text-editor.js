@@ -302,7 +302,7 @@ export class TextEditor {
       this.updateActiveElement({ width: parseFloat(e.target.value) });
     });
 
-    // Alignment (Enhanced for iOS WebKit Safari & Touch Devices)
+    // Alignment (Optimized for iOS 18 WebKit / Mobile & Desktop)
     const alignGroup = this.container.querySelector('#btn-group-align');
     const alignBtns = alignGroup ? alignGroup.querySelectorAll('button') : [];
 
@@ -314,55 +314,45 @@ export class TextEditor {
       this.inputText.style.textAlign = align;
       this.inputText.setAttribute('dir', 'ltr');
       this.updateActiveElement({ textAlign: align });
+      State.emit('stateRenderNeeded');
     };
 
-    if (alignGroup) {
-      let lastAlignTrigger = 0;
-      const handleAlignTrigger = (e) => {
-        const btn = e.target.closest('button[data-align]');
-        if (!btn) return;
-
+    let lastAlignTime = 0;
+    alignBtns.forEach(btn => {
+      const align = btn.dataset.align;
+      const onAlignAction = (e) => {
         const now = Date.now();
-        if (e.type === 'click' && now - lastAlignTrigger < 300) return;
-        lastAlignTrigger = now;
-
-        // Prevent iOS keyboard dismiss from discarding or swallowing the tap
-        if (e.cancelable && e.type !== 'click') {
-          e.preventDefault();
-        }
-
-        const align = btn.dataset.align;
+        if (now - lastAlignTime < 200) return;
+        lastAlignTime = now;
         setAlignment(align, btn);
       };
 
-      alignGroup.addEventListener('pointerdown', handleAlignTrigger, { passive: false });
-      alignGroup.addEventListener('click', handleAlignTrigger);
-    }
+      btn.addEventListener('click', onAlignAction);
+      btn.addEventListener('touchend', onAlignAction, { passive: true });
+    });
 
-    // Bold & Italic (Touch & Pointer Resilient)
-    let lastBoldTrigger = 0;
-    const handleBold = (e) => {
+    // Bold & Italic (Touch & Click Resilient for iOS 18 Safari & Android)
+    let lastBoldTime = 0;
+    const onBold = () => {
       const now = Date.now();
-      if (e.type === 'click' && now - lastBoldTrigger < 300) return;
-      lastBoldTrigger = now;
-      if (e.cancelable && e.type !== 'click') e.preventDefault();
+      if (now - lastBoldTime < 200) return;
+      lastBoldTime = now;
       const isBold = this.btnBold.classList.toggle('active');
       this.updateActiveElement({ fontWeight: isBold ? 'bold' : 'normal' });
     };
-    this.btnBold.addEventListener('pointerdown', handleBold, { passive: false });
-    this.btnBold.addEventListener('click', handleBold);
+    this.btnBold.addEventListener('click', onBold);
+    this.btnBold.addEventListener('touchend', onBold, { passive: true });
 
-    let lastItalicTrigger = 0;
-    const handleItalic = (e) => {
+    let lastItalicTime = 0;
+    const onItalic = () => {
       const now = Date.now();
-      if (e.type === 'click' && now - lastItalicTrigger < 300) return;
-      lastItalicTrigger = now;
-      if (e.cancelable && e.type !== 'click') e.preventDefault();
+      if (now - lastItalicTime < 200) return;
+      lastItalicTime = now;
       const isItalic = this.btnItalic.classList.toggle('active');
       this.updateActiveElement({ fontStyle: isItalic ? 'italic' : 'normal' });
     };
-    this.btnItalic.addEventListener('pointerdown', handleItalic, { passive: false });
-    this.btnItalic.addEventListener('click', handleItalic);
+    this.btnItalic.addEventListener('click', onItalic);
+    this.btnItalic.addEventListener('touchend', onItalic, { passive: true });
 
     // Badge controls
     this.checkBadge.addEventListener('change', (e) => {
@@ -502,18 +492,20 @@ export class TextEditor {
   }
 
   updateActiveElement(partial, recordUndo = true) {
-    let elem = this.activeElement;
+    let elem = null;
+    const sel = State.getSelectedElement();
+    if (sel && sel.type === 'text') {
+      elem = sel;
+    } else if (this.activeElement) {
+      elem = State.project.elements.find(e => e.id === this.activeElement.id);
+    }
     if (!elem) {
-      const sel = State.getSelectedElement();
-      if (sel && sel.type === 'text') {
-        elem = sel;
-      } else {
-        elem = State.project.elements.find(e => e.type === 'text');
-      }
-      if (elem) this.activeElement = elem;
+      elem = State.project.elements.find(e => e.type === 'text');
     }
     if (!elem) return;
+    this.activeElement = elem;
     State.updateElement(elem.id, partial, recordUndo);
+    State.emit('stateRenderNeeded');
   }
 
   updateActiveBadge(partial) {
