@@ -90,8 +90,13 @@ class ReelApp {
     setTimeout(() => this.resizeCanvas(), 100);
     this.setupResponsiveCanvas();
 
-    // Start render loop
-    State.on('stateRenderNeeded', () => { this.renderNeeded = true; });
+    // Start render loop with immediate synchronous paint fallback for iOS Safari rAF throttling
+    State.on('stateRenderNeeded', () => {
+      this.renderNeeded = true;
+      if (this.renderer && this.canvas) {
+        this.renderer.renderFrame(State.currentTime, this.canvas, { isExport: false });
+      }
+    });
     requestAnimationFrame(this.renderLoop.bind(this));
 
     Utils.showToast('ReelMaker ready! (Offline capable)', 'success', 3000);

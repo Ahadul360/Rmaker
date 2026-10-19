@@ -245,9 +245,11 @@ export class VideoExporter {
     if (!this.exportCanvas) {
       this.exportCanvas = document.createElement('canvas');
       this.exportCanvas.id = 'reelmaker-export-canvas';
-      // In iOS 18 WebKit / Mobile Safari, unattached canvases suspend their GPU backing store.
-      // Keeping it attached offscreen ensures VideoFrame and captureStream function without failure.
-      this.exportCanvas.style.cssText = 'position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-9999;';
+      // In iOS 18 WebKit / Mobile Safari, off-screen canvases outside the viewport (-9999px or 1px)
+      // have their GPU backing store suspended or culled.
+      // Keeping it within viewport bounds with non-zero dimensions and near-zero opacity ensures
+      // WebCodecs VideoFrame and captureStream encode crisp frames without failure.
+      this.exportCanvas.style.cssText = 'position:fixed; left:0; top:0; width:120px; height:120px; opacity:0.001; pointer-events:none; z-index:-1;';
       document.body.appendChild(this.exportCanvas);
     }
     this.exportCanvas.width = w;
@@ -296,31 +298,17 @@ export class VideoExporter {
   async startExport(options) {
     if (this.isExporting) return;
 
-    const { format = 'mp4', includeAudio = true } = options;
-    const project = State.project;
+    const { format = 'mp4' } = options;
     const hasWebCodecs = typeof window !== 'undefined' &&
       typeof window.VideoEncoder !== 'undefined' &&
       typeof window.VideoFrame !== 'undefined';
 
-    // If user wants MP4 and browser has WebCodecs, check for H.264/AVC support
+    // If user wants MP4 and browser has WebCodecs, check for H.264/AVC support.
+    // WebCodecs encodes frames directly from canvas without requiring MediaStream/MediaRecorder,
+    // avoiding the known WebKit bug on iOS Safari where mixed canvas+audio MediaStreams fail.
     if (format === 'mp4' && hasWebCodecs) {
       const isAvcSupported = await this.checkAvcSupport(options);
       if (isAvcSupported) {
-        // In iOS 18 Safari, AudioEncoder is undefined.
-        // If an audio track is enabled, check if MediaRecorder natively supports MP4 with AAC audio.
-        const audioRequested = includeAudio && project.audio && project.audio.enabled && !project.audio.muted;
-        const hasAudioEncoder = typeof window.AudioEncoder !== 'undefined';
-
-        if (audioRequested && !hasAudioEncoder) {
-          const supportsMp4Recorder = typeof MediaRecorder !== 'undefined' &&
-            (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a.40.2') ||
-             MediaRecorder.isTypeSupported('video/mp4'));
-          if (supportsMp4Recorder) {
-            console.log('[Export] AudioEncoder not present, but native MP4 MediaRecorder supported. Using MediaRecorder for MP4 with audio.');
-            return this.exportWithMediaRecorder(options);
-          }
-        }
-
         return this.exportWithWebCodecs(options);
       }
     }
@@ -639,17 +627,31 @@ export class VideoExporter {
 
       let audioStream = null;
       if (includeAudio && project.audio && project.audio.enabled) {
-        audioStream = AudioSys.getAudioMediaStream();
-        if (audioStream && audioStream.getAudioTracks().length > 0) {
-          combinedTracks.push(audioStream.getAudioTracks()[0]);
+        try {
+          audioStream = AudioSys.getAudioMediaStream();
+          if (audioStream && audioStream.getAudioTracks().length > 0) {
+            combinedTracks.push(audioStream.getAudioTracks()[0]);
+          }
+        } catch (e) {
+          console.warn('[Export] Audio stream capture skipped:', e);
         }
       }
 
-      const combinedStream = new MediaStream(combinedTracks);
-      this.mediaRecorder = new MediaRecorder(combinedStream, {
-        mimeType,
-        videoBitsPerSecond: resolution === '1080p' ? 8000000 : 4000000
-      });
+      let combinedStream = new MediaStream(combinedTracks);
+      try {
+        this.mediaRecorder = new MediaRecorder(combinedStream, {
+          mimeType,
+          videoBitsPerSecond: resolution === '1080p' ? 8000000 : 4000000
+        });
+      } catch (e) {
+        // Fallback for iOS WebKit (Bug 194640) where mixed canvas+audio stream throws NotSupportedError
+        console.warn('[Export] MediaRecorder rejected mixed audio+video stream, falling back to video-only track:', e);
+        combinedStream = new MediaStream([...canvasStream.getVideoTracks()]);
+        this.mediaRecorder = new MediaRecorder(combinedStream, {
+          mimeType,
+          videoBitsPerSecond: resolution === '1080p' ? 8000000 : 4000000
+        });
+      }
 
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {

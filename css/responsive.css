@@ -24,6 +24,7 @@
   .project-title-input {
     width: 130px;
   }
+
   .project-title-input:focus {
     width: 160px;
   }
@@ -32,6 +33,7 @@
     width: 105px;
     padding-bottom: 20px;
   }
+
   .track-header span {
     font-size: 10px;
   }
@@ -61,12 +63,16 @@
   .app-header {
     padding: 0 10px;
   }
+
   .brand-name {
     display: none;
   }
-  .save-badge, .offline-badge {
+
+  .save-badge,
+  .offline-badge {
     display: none;
   }
+
   .project-title-input {
     width: 110px;
     font-size: 12px;
@@ -76,12 +82,15 @@
   .project-menu-btn-text {
     display: none;
   }
+
   .btn-project-menu .menu-chevron {
     display: none;
   }
+
   .btn-project-menu {
     padding: 6px 9px;
   }
+
   .project-dropdown-menu {
     width: 275px;
     max-width: calc(100vw - 20px);
@@ -132,7 +141,8 @@
     max-width: 100%;
     max-height: 100%;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-    transition: none !important; /* avoid animated lag on mobile resize */
+    transition: none !important;
+    /* avoid animated lag on mobile resize */
   }
 
   #preview-canvas {
@@ -148,6 +158,7 @@
     top: 8px;
     padding: 3px 8px;
   }
+
   .viewport-floating-bar .btn-tool {
     font-size: 10px;
     padding: 2px 6px;
@@ -177,6 +188,7 @@
     gap: 1px;
     border-radius: var(--radius-sm);
   }
+
   .sidebar-nav-btn svg {
     width: 16px;
     height: 16px;
@@ -193,6 +205,7 @@
     z-index: 90;
     pointer-events: none;
   }
+
   .drawer-backdrop.mobile-open {
     display: block;
     pointer-events: auto;
@@ -258,6 +271,7 @@
     flex-direction: column;
     overflow: hidden;
   }
+
   .app-tool-panels.mobile-open {
     transform: translateY(0);
   }
@@ -270,6 +284,7 @@
     display: none;
     flex-direction: column;
   }
+
   .tool-panel-tab.active {
     display: flex;
   }
@@ -302,22 +317,27 @@
     box-sizing: border-box;
   }
 
+
   .timeline-header-bar {
     height: 42px;
-    padding: 0 10px;
+    padding: 0 5px;
   }
+
   .timeline-track-headers {
     width: 90px;
     padding-bottom: 0;
   }
+
   .timeline-headers-content {
     padding-bottom: 56px;
   }
+
   .track-header {
     height: 32px;
     padding: 0 6px;
     font-size: 10px;
   }
+
   .track-header.ruler-header {
     height: 24px;
     font-size: 9.5px;
@@ -325,21 +345,26 @@
     top: 0;
     z-index: 15;
   }
+
   .timeline-track-row {
     height: 32px;
   }
+
   .timeline-ruler {
     height: 24px;
     position: sticky;
     top: 0;
     z-index: 15;
   }
+
   .timeline-headers-content {
     padding-bottom: 56px;
   }
+
   .timeline-tracks-content {
     padding-bottom: 56px;
   }
+
   .timeline-scroll-container {
     overflow-x: auto;
     overflow-y: auto;
@@ -348,11 +373,13 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
+
   .timeline-scroll-container::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
   }
+
   .timeline-track-headers {
     overflow-y: auto;
     overflow-x: hidden;
@@ -361,24 +388,29 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
+
   .timeline-controls-left {
     gap: 6px;
   }
+
   .timeline-timecode {
     font-size: 10px;
-    padding: 2px 5px;
+    padding: 2px 2px;
     gap: 2px;
     letter-spacing: -0.2px;
     border-radius: 4px;
     min-height: 22px;
     line-height: 1.15;
   }
+
   .timeline-timecode span {
     font-size: 10px;
   }
+
   .timeline-duration-field label {
     display: none;
   }
+
   .timeline-duration-field input {
     width: 38px;
     font-size: 10.5px;
@@ -387,34 +419,125 @@
 
   @media (max-width: 480px) {
     .timeline-header-bar {
-      padding: 0 6px;
+      height: 34px !important;
+      padding: 0 4px !important;
     }
+
     .timeline-controls-left {
-      gap: 4px;
+      gap: 2.5px !important;
     }
+
     .timeline-controls-right {
-      gap: 5px;
+      gap: 2.5px !important;
     }
+
+    .timeline-header-bar .btn-play-pause {
+      width: 25px !important;
+      height: 25px !important;
+      min-width: 25px !important;
+      min-height: 25px !important;
+    }
+
+    .timeline-header-bar .btn-play-pause svg {
+      width: 13px !important;
+      height: 13px !important;
+    }
+
+    .timeline-header-bar .btn-icon {
+      width: 23px !important;
+      height: 23px !important;
+      min-width: 23px !important;
+      min-height: 23px !important;
+      padding: 2px !important;
+    }
+
+    .timeline-header-bar .btn-icon svg {
+      width: 13px !important;
+      height: 13px !important;
+    }
+
     .timeline-timecode {
-      font-size: 9px;
-      padding: 1.5px 4px;
-      gap: 1.5px;
-      letter-spacing: -0.35px;
-      border-radius: 3px;
-      min-height: 19px;
-      line-height: 1.15;
+      font-size: 8.5px !important;
+      padding: 1px 3px !important;
+      gap: 1px !important;
+      letter-spacing: -0.3px !important;
+      border-radius: 3px !important;
+      min-height: 17px !important;
+      line-height: 1.1 !important;
     }
+
     .timeline-timecode span {
-      font-size: 9px;
+      font-size: 8.5px !important;
     }
+
+    .timeline-duration-field {
+      gap: 2px !important;
+    }
+
     .timeline-duration-field input {
-      width: 34px;
-      font-size: 9.5px;
-      padding: 1px 3px;
+      width: 28px !important;
+      height: 19px !important;
+      font-size: 9px !important;
+      padding: 1px 2px !important;
+    }
+
+    .timeline-duration-field span {
+      font-size: 9px !important;
+    }
+
+    .timeline-zoom-controls {
+      display: flex;
+      gap: 2px;
+    }
+
+    .timeline-zoom-controls .btn-icon {
+      width: 22px !important;
+      height: 22px !important;
+      min-width: 22px !important;
+      min-height: 22px !important;
+      padding: 2px !important;
+    }
+
+    .timeline-zoom-controls .btn-icon svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .timeline-header-bar {
+      height: 32px !important;
+      padding: 0 2px !important;
+    }
+
+    .timeline-controls-left {
+      gap: 1.5px !important;
+    }
+
+    .timeline-controls-right {
+      gap: 1.5px !important;
+    }
+
+    .timeline-zoom-controls {
+      display: none !important;
+    }
+
+    .timeline-timecode {
+      font-size: 8px !important;
+      padding: 1px 2px !important;
+      letter-spacing: -0.4px !important;
+    }
+
+    .timeline-timecode span {
+      font-size: 8px !important;
     }
   }
 
   /* Touch-friendly Tap Targets */
+  .btn-tool svg {
+    pointer-events: none;
+  }
+
   .btn-play-pause {
     width: 30px;
     height: 30px;
@@ -447,6 +570,7 @@
     right: 16px;
     align-items: center;
   }
+
   .toast {
     max-width: 92vw;
     width: auto;
@@ -460,7 +584,10 @@
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

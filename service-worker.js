@@ -1,5 +1,5 @@
 /* ReelMaker Service Worker - Offline-first PWA Cache */
-const CACHE_NAME = 'reelmaker-v2.1.1';
+const CACHE_NAME = 'reelmaker-v2.2.0';
 
 const ASSETS_TO_CACHE = [
   './',

@@ -317,42 +317,45 @@ export class TextEditor {
       State.emit('stateRenderNeeded');
     };
 
-    let lastAlignTime = 0;
     alignBtns.forEach(btn => {
       const align = btn.dataset.align;
       const onAlignAction = (e) => {
-        const now = Date.now();
-        if (now - lastAlignTime < 200) return;
-        lastAlignTime = now;
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         setAlignment(align, btn);
       };
 
+      // pointerdown triggers instantaneously on touch down before keyboard dismiss or scroll cancellation on iOS Safari
+      btn.addEventListener('pointerdown', onAlignAction);
       btn.addEventListener('click', onAlignAction);
-      btn.addEventListener('touchend', onAlignAction, { passive: true });
     });
 
     // Bold & Italic (Touch & Click Resilient for iOS 18 Safari & Android)
-    let lastBoldTime = 0;
-    const onBold = () => {
-      const now = Date.now();
-      if (now - lastBoldTime < 200) return;
-      lastBoldTime = now;
+    const onBold = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const isBold = this.btnBold.classList.toggle('active');
       this.updateActiveElement({ fontWeight: isBold ? 'bold' : 'normal' });
+      State.emit('stateRenderNeeded');
     };
+    this.btnBold.addEventListener('pointerdown', onBold);
     this.btnBold.addEventListener('click', onBold);
-    this.btnBold.addEventListener('touchend', onBold, { passive: true });
 
-    let lastItalicTime = 0;
-    const onItalic = () => {
-      const now = Date.now();
-      if (now - lastItalicTime < 200) return;
-      lastItalicTime = now;
+    const onItalic = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       const isItalic = this.btnItalic.classList.toggle('active');
       this.updateActiveElement({ fontStyle: isItalic ? 'italic' : 'normal' });
+      State.emit('stateRenderNeeded');
     };
+    this.btnItalic.addEventListener('pointerdown', onItalic);
     this.btnItalic.addEventListener('click', onItalic);
-    this.btnItalic.addEventListener('touchend', onItalic, { passive: true });
 
     // Badge controls
     this.checkBadge.addEventListener('change', (e) => {
@@ -504,6 +507,9 @@ export class TextEditor {
     }
     if (!elem) return;
     this.activeElement = elem;
+    if (State.selectedElementId !== elem.id) {
+      State.selectElement(elem.id);
+    }
     State.updateElement(elem.id, partial, recordUndo);
     State.emit('stateRenderNeeded');
   }

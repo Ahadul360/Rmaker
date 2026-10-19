@@ -393,7 +393,6 @@ export class CanvasRenderer {
     }
 
     ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}", "Hind Siliguri", "Noto Serif Bengali", system-ui, sans-serif`;
-    ctx.direction = 'ltr';
     ctx.textBaseline = 'middle';
     ctx.textAlign = textAlign;
 
@@ -468,6 +467,8 @@ export class CanvasRenderer {
       } else if (textAlign === 'right') {
         x = halfBoxW;
       }
+
+      ctx.textAlign = textAlign;
 
       // Stroke / outline
       if (elem.stroke && elem.stroke.width > 0) {
