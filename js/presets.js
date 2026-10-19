@@ -183,7 +183,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@ahadul.com',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -272,7 +272,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@sad.quotes',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -375,7 +375,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@romantic.moments',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -478,7 +478,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@dark.thoughts',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -580,7 +580,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@daily.motivation',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -653,7 +653,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@minimal.bn',
+        text: 'ahadul.com',
         platform: 'none',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -740,7 +740,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@status.bangla',
+        text: 'ahadul.com',
         platform: 'facebook',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -842,7 +842,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@deepquotes',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -929,7 +929,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@goodvibes.reel',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1001,7 +1001,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@ahadul.com',
+        text: 'ahadul.com',
         platform: 'none',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1103,7 +1103,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@nature.quotes',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1205,7 +1205,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@cozy.cafe.bn',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1307,7 +1307,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@velvet.poetry',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1409,7 +1409,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@galaxy.vibes',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1511,7 +1511,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@vintage.diary',
+        text: 'ahadul.com',
         platform: 'facebook',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1613,7 +1613,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@golden.hour.bn',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1715,7 +1715,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@monsoon.reels',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1817,7 +1817,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@butterfly.dream',
+        text: 'ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1919,7 +1919,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@quote.square',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -2021,7 +2021,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@portrait.reels',
+        text: 'ahadul.com',
         platform: 'instagram',
         positionPreset: 'bottom-center',
         x: 0.5,

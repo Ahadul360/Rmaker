@@ -55,8 +55,8 @@ class ReelApp {
         proj.name = State.generateDefaultProjectName();
         needsSave = true;
       }
-      if (proj && proj.socialHandle && (proj.socialHandle.text === '@yourname' || proj.socialHandle.text === '@yourhandle')) {
-        proj.socialHandle.text = '@ahadul.com';
+      if (proj && proj.socialHandle && (proj.socialHandle.text === '@yourname' || proj.socialHandle.text === '@yourhandle' || proj.socialHandle.text === '@ahadul.com' || proj.socialHandle.text.startsWith('@'))) {
+        proj.socialHandle.text = 'ahadul.com';
         needsSave = true;
       }
       if (needsSave) {
@@ -759,7 +759,7 @@ class ReelApp {
     this.syncHandleUI = () => {
       const handle = State.project.socialHandle || {};
       checkEnable.checked = !!handle.enabled;
-      inputText.value = handle.text || '@ahadul.com';
+      inputText.value = handle.text || 'ahadul.com';
       selectPos.value = handle.positionPreset || 'bottom-center';
       inputColor.value = handle.color || '#5A5049';
       inputSize.value = handle.fontSize || 26;
