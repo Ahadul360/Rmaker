@@ -183,7 +183,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@yourname',
+        text: '@ahadul.com',
         platform: 'tiktok',
         positionPreset: 'bottom-center',
         x: 0.5,
@@ -1001,7 +1001,7 @@ export const Presets = {
       ],
       socialHandle: {
         enabled: true,
-        text: '@yourhandle',
+        text: '@ahadul.com',
         platform: 'none',
         positionPreset: 'bottom-center',
         x: 0.5,

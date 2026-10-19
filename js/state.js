@@ -320,6 +320,9 @@ class StateManager {
 
   loadProject(projectData) {
     this.project = Utils.deepClone(projectData);
+    if (this.project && this.project.socialHandle && (this.project.socialHandle.text === '@yourname' || this.project.socialHandle.text === '@yourhandle')) {
+      this.project.socialHandle.text = '@ahadul.com';
+    }
     this.selectedElementId = null;
     this.currentTime = 0;
     this.isPlaying = false;

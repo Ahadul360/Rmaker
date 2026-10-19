@@ -50,8 +50,16 @@ class ReelApp {
     const savedProjects = await Storage.getAllProjects();
     if (savedProjects.length > 0) {
       const proj = savedProjects[0];
+      let needsSave = false;
       if (proj && (!proj.name || proj.name === 'আমার প্রথম রিল (My First Reel)' || proj.name === 'আমার প্রথম রিল' || proj.name === 'Untitled Reel')) {
         proj.name = State.generateDefaultProjectName();
+        needsSave = true;
+      }
+      if (proj && proj.socialHandle && (proj.socialHandle.text === '@yourname' || proj.socialHandle.text === '@yourhandle')) {
+        proj.socialHandle.text = '@ahadul.com';
+        needsSave = true;
+      }
+      if (needsSave) {
         await Storage.saveProject(proj);
       }
       State.loadProject(proj);
@@ -751,7 +759,7 @@ class ReelApp {
     this.syncHandleUI = () => {
       const handle = State.project.socialHandle || {};
       checkEnable.checked = !!handle.enabled;
-      inputText.value = handle.text || '@yourname';
+      inputText.value = handle.text || '@ahadul.com';
       selectPos.value = handle.positionPreset || 'bottom-center';
       inputColor.value = handle.color || '#5A5049';
       inputSize.value = handle.fontSize || 26;

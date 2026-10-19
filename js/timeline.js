@@ -493,7 +493,7 @@ export class Timeline {
 
     let label = 'Element';
     if (customId === 'socialHandle') {
-      label = `Handle: ${elem.text || '@handle'}`;
+      label = `Handle: ${elem.text || '@ahadul.com'}`;
     } else if (elem.type === 'text') {
       label = `Text: ${elem.text ? elem.text.slice(0, 16).replace(/\n/g, ' ') : '...'}`;
     } else if (elem.type === 'emoji') {

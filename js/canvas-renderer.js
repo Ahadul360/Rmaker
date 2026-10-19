@@ -664,7 +664,7 @@ export class CanvasRenderer {
 
     const fontSize = handle.fontSize || 26;
     const fontFamily = handle.fontFamily || 'Outfit';
-    const text = handle.text || '@yourname';
+    const text = handle.text || '@ahadul.com';
 
     ctx.font = `600 ${fontSize}px "${fontFamily}", "Outfit", sans-serif`;
     ctx.textBaseline = 'middle';

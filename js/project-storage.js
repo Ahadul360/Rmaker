@@ -335,7 +335,7 @@ class ProjectStorage {
     const social = clean.socialHandle && typeof clean.socialHandle === 'object' ? clean.socialHandle : {};
     const safeSocial = {
       enabled: !!social.enabled,
-      text: typeof (social.text || social.handle) === 'string' ? String(social.text || social.handle).slice(0, 60) : '@yourname',
+      text: typeof (social.text || social.handle) === 'string' ? String(social.text || social.handle).slice(0, 60) : '@ahadul.com',
       platform: ['tiktok', 'instagram', 'facebook', 'youtube', 'none', 'generic'].includes(social.platform) ? social.platform : 'tiktok',
       positionPreset: ['bottom-center', 'bottom-left', 'bottom-right'].includes(social.positionPreset) ? social.positionPreset : 'bottom-center',
       x: Utils.clamp(Number.isFinite(Number(social.x)) ? Number(social.x) : 0.5, 0, 1),
