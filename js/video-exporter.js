@@ -28,6 +28,8 @@ export class VideoExporter {
     this.resultBlob = null;
     this.resultUrl = null;
     this.resultFormat = 'mp4';
+    this.cachedSps = null;
+    this.cachedPps = null;
 
     this.initExportModal();
   }
@@ -154,12 +156,16 @@ export class VideoExporter {
               <video id="export-video-preview" controls playsinline></video>
             </div>
 
-            <div class="modal-footer flex-column">
+            <div class="modal-footer flex-column" style="gap: 10px;">
               <button class="btn btn-primary btn-block" id="btn-download-video">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span id="btn-download-label">Download MP4 Video</span>
               </button>
-              <button class="btn btn-secondary btn-block" id="btn-export-again">Export Another Format / Resolution</button>
+              <button class="btn btn-secondary btn-block" id="btn-share-video" style="display: none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span id="btn-share-label">Share Video / Social Apps</span>
+              </button>
+              <button class="btn btn-secondary btn-block" id="btn-export-again" style="opacity: 0.85; font-size: 13px;">Export Another Format / Resolution</button>
             </div>
           </div>
         </div>
@@ -205,8 +211,31 @@ export class VideoExporter {
     });
 
     modal.querySelector('#btn-download-video').addEventListener('click', () => {
-      this.downloadExportedVideo();
+      const isIOS = typeof navigator !== 'undefined' && (
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      );
+      if (isIOS) {
+        this.shareVideo();
+      } else {
+        this.directDownloadVideo();
+      }
     });
+
+    const shareBtn = modal.querySelector('#btn-share-video');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => {
+        const isIOS = typeof navigator !== 'undefined' && (
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        );
+        if (isIOS) {
+          this.directDownloadVideo();
+        } else {
+          this.shareVideo();
+        }
+      });
+    }
 
     modal.querySelector('#btn-export-again').addEventListener('click', () => {
       this.showConfigView();
@@ -278,16 +307,36 @@ export class VideoExporter {
     const ext = isMp4 ? '.mp4' : '.webm';
     completeView.querySelector('#export-complete-title').textContent = `Reel Video Ready (${ext})!`;
 
-    // Detect if Web Share API with files is available (iOS Safari Save to Photos)
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+
     const canShareFiles = typeof navigator !== 'undefined' &&
       typeof navigator.canShare === 'function' &&
       typeof File !== 'undefined';
 
+    const btnDownload = completeView.querySelector('#btn-download-video');
     const downloadLabel = completeView.querySelector('#btn-download-label');
-    if (downloadLabel) {
-      downloadLabel.textContent = canShareFiles
-        ? 'Save to Photos / Share Video'
-        : (isMp4 ? 'Download MP4 Video' : 'Download WebM Video');
+    const btnShare = completeView.querySelector('#btn-share-video');
+    const shareLabel = completeView.querySelector('#btn-share-label');
+
+    if (isIOS) {
+      // On iOS Safari, Web Share API is the primary route to save videos directly into Camera Roll / Photos app.
+      // The secondary button lets the user download the raw file into Files / iCloud Drive.
+      if (downloadLabel) downloadLabel.textContent = 'Save to Photos (Camera Roll)';
+      if (btnShare) {
+        btnShare.style.display = 'flex';
+        if (shareLabel) shareLabel.textContent = `Download ${isMp4 ? 'MP4' : 'WebM'} File`;
+      }
+    } else {
+      // On Android and Desktop, direct download saves directly to the Downloads folder and Gallery.
+      // Web Share is offered as a secondary option for direct sharing to apps.
+      if (downloadLabel) downloadLabel.textContent = `Download ${isMp4 ? 'MP4' : 'WebM'} Video`;
+      if (btnShare) {
+        btnShare.style.display = canShareFiles ? 'flex' : 'none';
+        if (shareLabel) shareLabel.textContent = 'Share Video / Social Apps';
+      }
     }
 
     const videoEl = completeView.querySelector('#export-video-preview');
@@ -335,13 +384,14 @@ export class VideoExporter {
 
     const bitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 4500000 : 2500000);
 
+    // Prioritize Level 4.2 / 4.0. Level 3.1 has a maximum macroblock limit of 1,620 and fails for 720p/1080p on iOS VideoToolbox.
     const avcProfiles = [
-      'avc1.42001f', // Baseline Level 3.1 (universal across mobile and desktop)
-      'avc1.420028', // Baseline Level 4.0
-      'avc1.4d001f', // Main Level 3.1
-      'avc1.4d002a', // Main Level 4.2
-      'avc1.640028', // High Level 4.0
-      'avc1.64002a', // High Level 4.2
+      'avc1.4d002a', // Main Profile Level 4.2 (1080p up to 60fps - standard across iOS & Android)
+      'avc1.640028', // High Profile Level 4.0 (1080p @ 30fps)
+      'avc1.64002a', // High Profile Level 4.2
+      'avc1.420028', // Baseline Profile Level 4.0
+      'avc1.4d001f', // Main Profile Level 3.1
+      'avc1.42001f', // Baseline Profile Level 3.1
       'avc1.42E01E'  // Constrained Baseline
     ];
 
@@ -374,7 +424,136 @@ export class VideoExporter {
       } catch (e) {}
     }
 
-    return null;
+    // Fallback default for WebCodecs
+    return 'avc1.4d002a';
+  }
+
+  /**
+   * Helper to inspect H.264 video chunks and ensure ISO BMFF / AVCC compliance.
+   * On WebKit (Safari on macOS and iOS), VideoEncoder does not provide
+   * meta.decoderConfig.description (the AVCDecoderConfigurationRecord) and outputs
+   * raw Annex B streams (00 00 00 01) instead of length-prefixed AVCC samples.
+   * This method extracts SPS/PPS, constructs the ISO/IEC 14496-15 avcC box description,
+   * and converts the chunk samples into 4-byte length-prefixed AVCC format.
+   */
+  processH264Chunk(rawData, meta, avcCodec) {
+    const isAnnexB = rawData.length >= 4 && (
+      (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 1) ||
+      (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 0 && rawData[3] === 1)
+    );
+
+    if (!isAnnexB && meta?.decoderConfig?.description) {
+      return { data: rawData, meta };
+    }
+
+    // Parse NAL units from Annex B byte stream
+    const nalUnits = [];
+    const len = rawData.length;
+    let i = 0;
+    while (i < len) {
+      let startCodeLen = 0;
+      if (i + 4 <= len && rawData[i] === 0 && rawData[i + 1] === 0 && rawData[i + 2] === 0 && rawData[i + 3] === 1) {
+        startCodeLen = 4;
+      } else if (i + 3 <= len && rawData[i] === 0 && rawData[i + 1] === 0 && rawData[i + 2] === 1) {
+        startCodeLen = 3;
+      }
+
+      if (startCodeLen > 0) {
+        const nalStart = i + startCodeLen;
+        let nextStart = len;
+        for (let j = nalStart; j < len; j++) {
+          if (j + 3 <= len && rawData[j] === 0 && rawData[j + 1] === 0 && (rawData[j + 2] === 1 || (rawData[j + 2] === 0 && j + 4 <= len && rawData[j + 3] === 1))) {
+            nextStart = j;
+            break;
+          }
+        }
+        if (nextStart > nalStart) {
+          let nalEnd = nextStart;
+          while (nalEnd > nalStart && rawData[nalEnd - 1] === 0) {
+            nalEnd--;
+          }
+          if (nalEnd > nalStart) {
+            nalUnits.push(rawData.subarray(nalStart, nalEnd));
+          }
+        }
+        i = nextStart;
+      } else {
+        i++;
+      }
+    }
+
+    if (nalUnits.length === 0) {
+      return { data: rawData, meta };
+    }
+
+    const sampleNals = [];
+    let avccLength = 0;
+
+    for (const nal of nalUnits) {
+      const nalType = nal[0] & 0x1F;
+      if (nalType === 7) {
+        // Sequence Parameter Set (SPS)
+        this.cachedSps = new Uint8Array(nal);
+        continue;
+      }
+      if (nalType === 8) {
+        // Picture Parameter Set (PPS)
+        this.cachedPps = new Uint8Array(nal);
+        continue;
+      }
+      if (nalType === 9) {
+        // Access Unit Delimiter (AUD) - not needed in AVCC sample
+        continue;
+      }
+      sampleNals.push(nal);
+      avccLength += 4 + nal.length;
+    }
+
+    // If description is missing, construct AVCDecoderConfigurationRecord from SPS and PPS
+    if ((!meta?.decoderConfig?.description) && this.cachedSps && this.cachedPps) {
+      const sps = this.cachedSps;
+      const pps = this.cachedPps;
+      const recordLen = 11 + sps.length + pps.length;
+      const avcRecord = new Uint8Array(recordLen);
+      let o = 0;
+      avcRecord[o++] = 0x01; // configurationVersion
+      avcRecord[o++] = sps[1]; // AVCProfileIndication
+      avcRecord[o++] = sps[2]; // profile_compatibility
+      avcRecord[o++] = sps[3]; // AVCLevelIndication
+      avcRecord[o++] = 0xFF; // lengthSizeMinusOne = 3 (4-byte prefix) | 0xFC
+      avcRecord[o++] = 0xE1; // numOfSequenceParameterSets = 1 | 0xE0
+      avcRecord[o++] = (sps.length >> 8) & 0xFF;
+      avcRecord[o++] = sps.length & 0xFF;
+      avcRecord.set(sps, o);
+      o += sps.length;
+      avcRecord[o++] = 0x01; // numOfPictureParameterSets = 1
+      avcRecord[o++] = (pps.length >> 8) & 0xFF;
+      avcRecord[o++] = pps.length & 0xFF;
+      avcRecord.set(pps, o);
+
+      meta = meta || {};
+      meta.decoderConfig = meta.decoderConfig || { codec: avcCodec };
+      meta.decoderConfig.description = avcRecord;
+    }
+
+    if (sampleNals.length === 0) {
+      return { data: null, meta };
+    }
+
+    // Pack into 4-byte big-endian length-prefixed AVCC format
+    const avccData = new Uint8Array(avccLength);
+    let outOffset = 0;
+    for (const nal of sampleNals) {
+      const nLen = nal.length;
+      avccData[outOffset++] = (nLen >> 24) & 0xFF;
+      avccData[outOffset++] = (nLen >> 16) & 0xFF;
+      avccData[outOffset++] = (nLen >> 8) & 0xFF;
+      avccData[outOffset++] = nLen & 0xFF;
+      avccData.set(nal, outOffset);
+      outOffset += nLen;
+    }
+
+    return { data: avccData, meta };
   }
 
   /**
@@ -382,7 +561,7 @@ export class VideoExporter {
    * Generates true H.264/AAC MP4 with FastStart (moov atom at front) and exact duration.
    * Perfect for TikTok, Facebook Reels, YouTube Shorts & Instagram.
    */
-  async exportWithWebCodecs(options, avcCodec = 'avc1.42001f') {
+  async exportWithWebCodecs(options, avcCodec = 'avc1.4d002a') {
     const { resolution = '1080p', fps = 30, includeAudio = true } = options;
     const project = State.project;
     const duration = project.duration;
@@ -395,6 +574,10 @@ export class VideoExporter {
     exportW = Math.floor(exportW / 2) * 2;
     exportH = Math.floor(exportH / 2) * 2;
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
+
+    // Reset cached SPS/PPS for this export session
+    this.cachedSps = null;
+    this.cachedPps = null;
 
     // Prepare DOM-attached offscreen canvas (prevents iOS WebKit GPU buffer suspension)
     this.setupExportCanvas(exportW, exportH);
@@ -472,10 +655,13 @@ export class VideoExporter {
               ? chunk.duration
               : frameDurationUs;
 
-            const data = new Uint8Array(chunk.byteLength);
-            chunk.copyTo(data);
+            const rawData = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(rawData);
 
-            muxer.addVideoChunkRaw(data, chunk.type, ts, dur, meta);
+            const processed = this.processH264Chunk(rawData, meta, avcCodec);
+            if (processed.data && processed.data.byteLength > 0) {
+              muxer.addVideoChunkRaw(processed.data, chunk.type, ts, dur, processed.meta);
+            }
           } catch (err) {
             console.error('[Muxer addVideoChunkRaw error]', err);
             encoderError = err;
@@ -857,7 +1043,39 @@ export class VideoExporter {
     Utils.showToast('Export cancelled.', 'info');
   }
 
-  async downloadExportedVideo() {
+  /**
+   * Direct file download to user storage (Downloads folder / Files app).
+   * Note: We avoid target="_blank" because mobile browsers (Android Chrome and Safari)
+   * block or show blank pages for blob: URLs in new tabs.
+   */
+  directDownloadVideo() {
+    if (!this.resultBlob || !this.resultUrl) return;
+
+    const isMp4 = this.resultFormat === 'mp4';
+    const ext = isMp4 ? 'mp4' : 'webm';
+    const safeName = (State.project.name || 'reel').replace(/[^a-z0-9_\-\u0980-\u09FF]/gi, '_');
+    const filename = `${safeName}_${Date.now()}.${ext}`;
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = this.resultUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) {
+        a.parentNode.removeChild(a);
+      }
+    }, 500);
+
+    Utils.showToast(`Downloading ${filename}...`, 'success');
+  }
+
+  /**
+   * Web Share API for saving video directly to Camera Roll / Photos on iOS,
+   * or sharing directly to social media apps on Android and supported desktop browsers.
+   */
+  async shareVideo() {
     if (!this.resultBlob || !this.resultUrl) return;
 
     const isMp4 = this.resultFormat === 'mp4';
@@ -868,7 +1086,6 @@ export class VideoExporter {
 
     const videoFile = new File([this.resultBlob], filename, { type: mimeType });
 
-    // 1. Web Share API (Primary for iOS Safari / Mobile - lets user "Save Video" to Camera Roll / Photos)
     if (navigator.canShare && navigator.canShare({ files: [videoFile] })) {
       try {
         await navigator.share({
@@ -883,19 +1100,28 @@ export class VideoExporter {
           return; // User cancelled the native share sheet
         }
         console.warn('Web Share failed, falling back to direct download:', err);
+        this.directDownloadVideo();
       }
+    } else {
+      this.directDownloadVideo();
     }
+  }
 
-    // 2. Fallback to standard anchor download (Desktop & browsers without Web Share)
-    const a = document.createElement('a');
-    a.href = this.resultUrl;
-    a.download = filename;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 150);
+  /**
+   * Default export download handler:
+   * On iOS, delegates to shareVideo() so user can select native "Save Video" to Camera Roll.
+   * On Android / Desktop, triggers immediate direct file download.
+   */
+  downloadExportedVideo() {
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
 
-    Utils.showToast(`Saved as ${filename}`, 'success');
+    if (isIOS) {
+      return this.shareVideo();
+    }
+    return this.directDownloadVideo();
   }
 }
 
