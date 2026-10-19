@@ -449,7 +449,7 @@ export class CanvasRenderer {
       ctx.shadowOffsetY = elem.shadow.offsetY || 2;
     }
 
-    // Render Text Lines with accurate alignment
+    // Render Text Lines with accurate alignment (coordinate-based for 100% iOS Safari & Android consistency)
     const startY = -halfH + lineSpacing / 2;
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
@@ -461,14 +461,18 @@ export class CanvasRenderer {
         line = line.trim();
       }
       const y = startY + i * lineSpacing;
+      const lineW = ctx.measureText(line).width;
       let x = 0;
       if (textAlign === 'left') {
         x = -halfBoxW;
       } else if (textAlign === 'right') {
-        x = halfBoxW;
+        x = halfBoxW - lineW;
+      } else {
+        // center: mathematical centering ensures accurate rendering on iOS WebKit
+        x = -lineW / 2;
       }
 
-      ctx.textAlign = textAlign;
+      ctx.textAlign = 'left';
 
       // Stroke / outline
       if (elem.stroke && elem.stroke.width > 0) {
@@ -664,7 +668,7 @@ export class CanvasRenderer {
 
     ctx.font = `600 ${fontSize}px "${fontFamily}", "Outfit", sans-serif`;
     ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
 
     const textMetrics = ctx.measureText(text);
     const textWidth = textMetrics.width;
@@ -686,7 +690,7 @@ export class CanvasRenderer {
 
     // Text
     ctx.fillStyle = handle.color || '#5A5049';
-    ctx.fillText(text, 0, 0);
+    ctx.fillText(text, -textWidth / 2, 0);
 
     ctx.restore();
 

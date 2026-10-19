@@ -320,36 +320,69 @@ export class VideoExporter {
   async checkAvcSupport(options) {
     const { resolution = '1080p', fps = 30 } = options;
     const project = State.project;
-    const baseWidth = Presets.aspectRatios[project.aspectRatio].width;
-    const baseHeight = Presets.aspectRatios[project.aspectRatio].height;
-    const scale = Presets.resolutions[resolution].scale;
-    const exportW = Math.round(baseWidth * scale);
-    const exportH = Math.round(baseHeight * scale);
+    const baseWidth = Presets.aspectRatios[project.aspectRatio]?.width || 1080;
+    const baseHeight = Presets.aspectRatios[project.aspectRatio]?.height || 1920;
+    const scale = Presets.resolutions[resolution]?.scale || 1.0;
+    let exportW = Math.round(baseWidth * scale);
+    let exportH = Math.round(baseHeight * scale);
+    // Ensure even dimensions (required for H.264 Apple VideoToolbox HW encoding)
+    exportW = Math.floor(exportW / 2) * 2;
+    exportH = Math.floor(exportH / 2) * 2;
 
-    // Order matters: check Level 4.2 / Level 4.0 first (required for 1080p hardware encoding on iOS Safari)
+    const bitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 4500000 : 2500000);
+
     const avcProfiles = [
-      'avc1.4d002a', // Main Profile, Level 4.2 (Standard Apple VideoToolbox HW)
-      'avc1.640028', // High Profile, Level 4.0
-      'avc1.420028', // Baseline Profile, Level 4.0
-      'avc1.4d0028', // Main Profile, Level 4.0
-      'avc1.42001f', // Baseline Profile, Level 3.1
+      'avc1.4d002a', // Main Level 4.2
+      'avc1.64002a', // High Level 4.2
+      'avc1.42002a', // Baseline Level 4.2
+      'avc1.640033', // High Level 5.1 (Standard 1080p on iOS 16+)
+      'avc1.4d0033', // Main Level 5.1
+      'avc1.420033', // Baseline Level 5.1
+      'avc1.640032', // High Level 5.0
+      'avc1.4d0032', // Main Level 5.0
+      'avc1.420032', // Baseline Level 5.0
+      'avc1.640028', // High Level 4.0
+      'avc1.4d0028', // Main Level 4.0
+      'avc1.420028', // Baseline Level 4.0
+      'avc1.64001f', // High Level 3.1
+      'avc1.4d001f', // Main Level 3.1
+      'avc1.42001f', // Baseline Level 3.1
       'avc1.42E01E'  // Constrained Baseline
     ];
-    for (const codec of avcProfiles) {
-      try {
-        const res = await VideoEncoder.isConfigSupported({
-          codec,
-          width: exportW,
-          height: exportH,
-          bitrate: resolution === '1080p' ? 8000000 : 4000000,
-          framerate: fps
-        });
-        if (res && res.supported) {
-          return codec;
-        }
-      } catch (e) {}
+
+    if (typeof VideoEncoder !== 'undefined' && typeof VideoEncoder.isConfigSupported === 'function') {
+      for (const codec of avcProfiles) {
+        try {
+          const res = await VideoEncoder.isConfigSupported({
+            codec,
+            width: exportW,
+            height: exportH,
+            bitrate,
+            framerate: fps
+          });
+          if (res && res.supported) {
+            return codec;
+          }
+        } catch (e) {}
+      }
+
+      // Fallback query with basic dimensions (some WebKit versions require omitting bitrate in query)
+      for (const codec of avcProfiles) {
+        try {
+          const res = await VideoEncoder.isConfigSupported({
+            codec,
+            width: exportW,
+            height: exportH
+          });
+          if (res && res.supported) {
+            return codec;
+          }
+        } catch (e) {}
+      }
     }
-    return false;
+
+    // Default to Apple VideoToolbox's universal Main 4.2 codec
+    return 'avc1.4d002a';
   }
 
   /**
@@ -365,8 +398,10 @@ export class VideoExporter {
     const baseHeight = Presets.aspectRatios[project.aspectRatio].height;
     const scale = Presets.resolutions[resolution].scale;
 
-    const exportW = Math.round(baseWidth * scale);
-    const exportH = Math.round(baseHeight * scale);
+    let exportW = Math.round(baseWidth * scale);
+    let exportH = Math.round(baseHeight * scale);
+    exportW = Math.floor(exportW / 2) * 2;
+    exportH = Math.floor(exportH / 2) * 2;
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
 
     const avcCodec = await this.checkAvcSupport(options) || 'avc1.4d002a';
@@ -428,6 +463,7 @@ export class VideoExporter {
 
       // 3. Initialize VideoEncoder with monotonic timestamp enforcement
       let lastVideoTimestampUs = -1;
+      let encoderError = null;
       const videoEncoder = new VideoEncoder({
         output: (chunk, meta) => {
           let ts = chunk.timestamp;
@@ -438,16 +474,28 @@ export class VideoExporter {
           lastVideoTimestampUs = ts;
           muxer.addVideoChunk(chunk, meta, ts);
         },
-        error: (err) => console.error('[VideoEncoder error]', err)
+        error: (err) => {
+          console.error('[VideoEncoder error]', err);
+          encoderError = err;
+        }
       });
 
-      videoEncoder.configure({
+      const encoderConfig = {
         codec: avcCodec,
         width: exportW,
         height: exportH,
         bitrate: videoBitrate,
-        framerate: fps
-      });
+        framerate: fps,
+        avc: { format: 'avc' }
+      };
+
+      try {
+        videoEncoder.configure(encoderConfig);
+      } catch (cfgErr) {
+        // Fallback without avc sub-dict if WebKit rejects it
+        delete encoderConfig.avc;
+        videoEncoder.configure(encoderConfig);
+      }
 
       // 4. Encode Audio (if enabled and AudioEncoder supported)
       let audioEncoder = null;
@@ -502,19 +550,42 @@ export class VideoExporter {
           return;
         }
 
+        if (encoderError) {
+          throw new Error(`Video encoder error: ${encoderError.message || encoderError}`);
+        }
+
         const currentTime = frameIndex / fps;
         this.exportRenderer.renderFrame(currentTime, this.exportCanvas, { isExport: true });
 
         const timestampUs = Math.round(currentTime * 1000000);
-        const videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
-        const isKey = frameIndex % (fps * 2) === 0;
+        let videoFrame = null;
 
+        // Construct VideoFrame safely with alpha discard and ImageBitmap fallback for iOS WebKit
+        try {
+          videoFrame = new VideoFrame(this.exportCanvas, {
+            timestamp: timestampUs,
+            alpha: 'discard'
+          });
+        } catch (vfErr) {
+          try {
+            const bmp = await createImageBitmap(this.exportCanvas);
+            videoFrame = new VideoFrame(bmp, {
+              timestamp: timestampUs,
+              alpha: 'discard'
+            });
+            bmp.close();
+          } catch (bmpErr) {
+            videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
+          }
+        }
+
+        const isKey = frameIndex % (fps * 2) === 0;
         videoEncoder.encode(videoFrame, { keyFrame: isKey });
         videoFrame.close();
 
         // Control memory queue backpressure
-        if (videoEncoder.encodeQueueSize > 6) {
-          await new Promise(r => setTimeout(r, 4));
+        if (videoEncoder.encodeQueueSize > 5) {
+          await new Promise(r => setTimeout(r, 8));
         }
 
         if (frameIndex % 3 === 0 || frameIndex === totalFrames - 1) {
@@ -537,13 +608,14 @@ export class VideoExporter {
     } catch (err) {
       console.error('WebCodecs export failed:', err);
       this.cleanupExportCanvas();
-      // If WebCodecs failed unexpectedly, fallback to MediaRecorder
-      if (this.isExporting && !this.abortController.signal.aborted) {
+      // Only fallback to MediaRecorder if canvas.captureStream actually exists on this device
+      const canCapture = this.exportCanvas && typeof this.exportCanvas.captureStream === 'function';
+      if (this.isExporting && !this.abortController.signal.aborted && canCapture) {
         console.warn('Falling back to MediaRecorder...');
         return this.exportWithMediaRecorder(options);
       }
       this.cancelExport();
-      Utils.showToast(`Export failed: ${err.message}`, 'error');
+      Utils.showToast(`Export failed: ${err.message}`, 'error', 5000);
     }
   }
 
@@ -605,8 +677,14 @@ export class VideoExporter {
       return;
     }
 
-    // Attach to DOM so captureStream works reliably in iOS WebKit / Safari
+    // Guard against browsers (like iOS Safari) where canvas.captureStream is not implemented
     this.setupExportCanvas(exportW, exportH);
+    if (!this.exportCanvas || typeof this.exportCanvas.captureStream !== 'function') {
+      this.cleanupExportCanvas();
+      this.cancelExport();
+      Utils.showToast('MediaRecorder canvas capture is not supported on this device. Please select MP4 format.', 'error', 5000);
+      return;
+    }
 
     this.showProgressView();
     this.isExporting = true;
