@@ -387,9 +387,13 @@ export class CanvasRenderer {
     const fontWeight = elem.fontWeight || 'normal';
     const fontStyle = elem.fontStyle || 'normal';
     const lineHeight = elem.lineHeight || 1.45;
-    const textAlign = elem.textAlign || 'center';
+    let textAlign = (elem.textAlign || 'center').toLowerCase();
+    if (!['left', 'center', 'right'].includes(textAlign)) {
+      textAlign = 'center';
+    }
 
     ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px "${fontFamily}", "Hind Siliguri", "Noto Serif Bengali", system-ui, sans-serif`;
+    ctx.direction = 'ltr';
     ctx.textBaseline = 'middle';
     ctx.textAlign = textAlign;
 
@@ -449,7 +453,14 @@ export class CanvasRenderer {
     // Render Text Lines with accurate alignment
     const startY = -halfH + lineSpacing / 2;
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+      let line = lines[i];
+      if (textAlign === 'right') {
+        line = line.trimEnd();
+      } else if (textAlign === 'left') {
+        line = line.trimStart();
+      } else {
+        line = line.trim();
+      }
       const y = startY + i * lineSpacing;
       let x = 0;
       if (textAlign === 'left') {

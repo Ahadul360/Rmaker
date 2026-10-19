@@ -246,6 +246,7 @@ button, input, select, textarea {
 
 .btn-tool {
   flex: 1;
+  min-height: 38px;
   padding: 6px 10px;
   background: transparent;
   color: var(--text-secondary);
@@ -255,6 +256,10 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .btn-tool:not(:last-child) {
   border-right: 1px solid var(--border-color);
@@ -266,6 +271,14 @@ button, input, select, textarea {
 .btn-tool.active {
   background: var(--accent);
   color: #FFFFFF;
+}
+
+/* Ensure SVG icons inside buttons do not swallow touch/click events on iOS Safari / WebKit */
+.btn-tool svg,
+.btn-tool svg *,
+button svg,
+button svg * {
+  pointer-events: none !important;
 }
 
 /* ==========================================================================

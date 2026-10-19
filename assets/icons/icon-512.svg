@@ -1,37 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1A1D24" />
-      <stop offset="100%" stop-color="#111318" />
-    </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A18AFF" />
-      <stop offset="100%" stop-color="#6C5CE7" />
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#8B7CFF" flood-opacity="0.4" />
-    </filter>
-  </defs>
-  <!-- Background rounded app squircle -->
-  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
-  <rect x="12" y="12" width="488" height="488" rx="100" fill="none" stroke="#303540" stroke-width="4" />
-  
-  <!-- Stylized vertical 9:16 Reel Film Frame -->
-  <rect x="156" y="96" width="200" height="320" rx="28" fill="#F7F1E5" filter="url(#glow)" />
-  
-  <!-- Film Sprocket holes / ticks -->
-  <rect x="176" y="120" width="16" height="12" rx="3" fill="#685B53" opacity="0.4" />
-  <rect x="176" y="146" width="16" height="12" rx="3" fill="#685B53" opacity="0.4" />
-  <rect x="176" y="172" width="16" height="12" rx="3" fill="#685B53" opacity="0.4" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
-  <!-- Center Quote / Text Lines & Play Accent -->
-  <rect x="206" y="196" width="100" height="14" rx="7" fill="#2C2724" />
-  <rect x="220" y="222" width="72" height="12" rx="6" fill="#685B53" opacity="0.8" />
-  
-  <!-- Play Badge Gradient Circle -->
-  <circle cx="256" cy="286" r="34" fill="url(#accentGrad)" />
-  <polygon points="248,272 272,286 248,300" fill="#FFFFFF" />
-
-  <!-- Mini Sparkle / Doodle -->
-  <path d="M 320 126 Q 320 138 308 138 Q 320 138 320 150 Q 320 138 332 138 Q 320 138 320 126 Z" fill="#8B7CFF" />
+<defs>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#6C3BFF"/>
+    <stop offset="100%" stop-color="#A855F7"/>
+  </linearGradient>
+</defs>
+<!-- speed lines -->
+<rect x="58" y="182" width="88" height="22" rx="11" fill="url(#g)"/>
+<rect x="42" y="232" width="62" height="22" rx="11" fill="url(#g)"/>
+<rect x="58" y="282" width="88" height="22" rx="11" fill="url(#g)"/>
+<!-- camera body -->
+<rect x="154" y="104" width="236" height="304" rx="58" fill="#111827"/>
+<rect x="190" y="140" width="164" height="232" rx="38" fill="#FFFFFF"/>
+<!-- play -->
+<path d="M244 203 L244 309 L319 256 Z" fill="url(#g)"/>
+<!-- camera lens / right wedge -->
+<path d="M390 190 L470 145 Q486 137 486 156 L486 356 Q486 375 470 367 L390 322 Z" fill="url(#g)"/>
 </svg>

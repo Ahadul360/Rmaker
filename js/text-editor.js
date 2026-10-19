@@ -64,23 +64,23 @@ export class TextEditor {
         <div class="form-row">
           <div class="form-group flex-1">
             <label>Alignment:</label>
-            <div class="btn-group" id="btn-group-align">
-              <button class="btn-tool" data-align="left" title="Left">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+            <div class="btn-group" id="btn-group-align" role="group" aria-label="Text Alignment">
+              <button type="button" class="btn-tool" data-align="left" title="Left" aria-label="Align Left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
               </button>
-              <button class="btn-tool active" data-align="center" title="Center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="18" y1="14" x2="6" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+              <button type="button" class="btn-tool active" data-align="center" title="Center" aria-label="Align Center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="18" y1="14" x2="6" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
               </button>
-              <button class="btn-tool" data-align="right" title="Right">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="9" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+              <button type="button" class="btn-tool" data-align="right" title="Right" aria-label="Align Right">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="9" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
               </button>
             </div>
           </div>
           <div class="form-group flex-1">
             <label>Formatting:</label>
-            <div class="btn-group">
-              <button class="btn-tool" id="btn-toggle-bold" title="Bold"><strong>B</strong></button>
-              <button class="btn-tool" id="btn-toggle-italic" title="Italic"><em>I</em></button>
+            <div class="btn-group" role="group" aria-label="Text Formatting">
+              <button type="button" class="btn-tool" id="btn-toggle-bold" title="Bold" aria-label="Bold"><strong>B</strong></button>
+              <button type="button" class="btn-tool" id="btn-toggle-italic" title="Italic" aria-label="Italic"><em>I</em></button>
             </div>
           </div>
         </div>
@@ -302,28 +302,67 @@ export class TextEditor {
       this.updateActiveElement({ width: parseFloat(e.target.value) });
     });
 
-    // Alignment
-    const alignBtns = this.container.querySelectorAll('#btn-group-align button');
-    alignBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        alignBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const align = btn.dataset.align;
-        this.inputText.style.textAlign = align;
-        this.updateActiveElement({ textAlign: align });
-      });
-    });
+    // Alignment (Enhanced for iOS WebKit Safari & Touch Devices)
+    const alignGroup = this.container.querySelector('#btn-group-align');
+    const alignBtns = alignGroup ? alignGroup.querySelectorAll('button') : [];
 
-    // Bold & Italic
-    this.btnBold.addEventListener('click', () => {
+    const setAlignment = (align, targetBtn) => {
+      if (!align) return;
+      alignBtns.forEach(b => {
+        b.classList.toggle('active', b === targetBtn || b.dataset.align === align);
+      });
+      this.inputText.style.textAlign = align;
+      this.inputText.setAttribute('dir', 'ltr');
+      this.updateActiveElement({ textAlign: align });
+    };
+
+    if (alignGroup) {
+      let lastAlignTrigger = 0;
+      const handleAlignTrigger = (e) => {
+        const btn = e.target.closest('button[data-align]');
+        if (!btn) return;
+
+        const now = Date.now();
+        if (e.type === 'click' && now - lastAlignTrigger < 300) return;
+        lastAlignTrigger = now;
+
+        // Prevent iOS keyboard dismiss from discarding or swallowing the tap
+        if (e.cancelable && e.type !== 'click') {
+          e.preventDefault();
+        }
+
+        const align = btn.dataset.align;
+        setAlignment(align, btn);
+      };
+
+      alignGroup.addEventListener('pointerdown', handleAlignTrigger, { passive: false });
+      alignGroup.addEventListener('click', handleAlignTrigger);
+    }
+
+    // Bold & Italic (Touch & Pointer Resilient)
+    let lastBoldTrigger = 0;
+    const handleBold = (e) => {
+      const now = Date.now();
+      if (e.type === 'click' && now - lastBoldTrigger < 300) return;
+      lastBoldTrigger = now;
+      if (e.cancelable && e.type !== 'click') e.preventDefault();
       const isBold = this.btnBold.classList.toggle('active');
       this.updateActiveElement({ fontWeight: isBold ? 'bold' : 'normal' });
-    });
+    };
+    this.btnBold.addEventListener('pointerdown', handleBold, { passive: false });
+    this.btnBold.addEventListener('click', handleBold);
 
-    this.btnItalic.addEventListener('click', () => {
+    let lastItalicTrigger = 0;
+    const handleItalic = (e) => {
+      const now = Date.now();
+      if (e.type === 'click' && now - lastItalicTrigger < 300) return;
+      lastItalicTrigger = now;
+      if (e.cancelable && e.type !== 'click') e.preventDefault();
       const isItalic = this.btnItalic.classList.toggle('active');
       this.updateActiveElement({ fontStyle: isItalic ? 'italic' : 'normal' });
-    });
+    };
+    this.btnItalic.addEventListener('pointerdown', handleItalic, { passive: false });
+    this.btnItalic.addEventListener('click', handleItalic);
 
     // Badge controls
     this.checkBadge.addEventListener('change', (e) => {
@@ -444,6 +483,7 @@ export class TextEditor {
     // Align buttons
     const textAlign = elem.textAlign || 'center';
     this.inputText.style.textAlign = textAlign;
+    this.inputText.setAttribute('dir', 'ltr');
     const alignBtns = this.container.querySelectorAll('#btn-group-align button');
     alignBtns.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.align === textAlign);
@@ -462,14 +502,31 @@ export class TextEditor {
   }
 
   updateActiveElement(partial, recordUndo = true) {
-    if (!this.activeElement) return;
-    State.updateElement(this.activeElement.id, partial, recordUndo);
+    let elem = this.activeElement;
+    if (!elem) {
+      const sel = State.getSelectedElement();
+      if (sel && sel.type === 'text') {
+        elem = sel;
+      } else {
+        elem = State.project.elements.find(e => e.type === 'text');
+      }
+      if (elem) this.activeElement = elem;
+    }
+    if (!elem) return;
+    State.updateElement(elem.id, partial, recordUndo);
   }
 
   updateActiveBadge(partial) {
-    if (!this.activeElement) return;
-    const currentBadge = this.activeElement.backgroundBadge || {};
+    let elem = this.activeElement;
+    if (!elem) {
+      const sel = State.getSelectedElement();
+      if (sel && sel.type === 'text') elem = sel;
+      else elem = State.project.elements.find(e => e.type === 'text');
+      if (elem) this.activeElement = elem;
+    }
+    if (!elem) return;
+    const currentBadge = elem.backgroundBadge || {};
     const updated = { ...currentBadge, ...partial };
-    State.updateElement(this.activeElement.id, { backgroundBadge: updated });
+    State.updateElement(elem.id, { backgroundBadge: updated });
   }
 }

@@ -1,10 +1,12 @@
 /* ReelMaker Service Worker - Offline-first PWA Cache */
-const CACHE_NAME = 'reelmaker-v1.0.16';
+const CACHE_NAME = 'reelmaker-v1.0.19';
 
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './favicon.ico',
+  './apple-touch-icon.png',
   './css/styles.css',
   './css/editor.css',
   './css/timeline.css',
@@ -54,6 +56,13 @@ const ASSETS_TO_CACHE = [
   './assets/music/uplifting-acoustic-15s.wav',
   './assets/music/midnight-rain-15s.wav',
   './assets/music/minimal-pulse-15s.wav',
+  './assets/icons/favicon.ico',
+  './assets/icons/favicon.svg',
+  './assets/icons/favicon-32.png',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/app-icon.svg',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
   './assets/icons/icon-192.svg',
   './assets/icons/icon-512.svg'
 ];
