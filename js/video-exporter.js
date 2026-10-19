@@ -30,6 +30,7 @@ export class VideoExporter {
     this.resultFormat = 'mp4';
     this.cachedSps = null;
     this.cachedPps = null;
+    this.cachedDescription = null;
 
     this.initExportModal();
   }
@@ -384,12 +385,15 @@ export class VideoExporter {
 
     const bitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 4500000 : 2500000);
 
-    // Prioritize Level 4.2 / 4.0. Level 3.1 has a maximum macroblock limit of 1,620 and fails for 720p/1080p on iOS VideoToolbox.
+    // Prioritize Level 4.2 / 5.1 / 4.0. Level 3.1 has a maximum macroblock limit of 1,620 and fails for 720p/1080p on iOS VideoToolbox.
     const avcProfiles = [
       'avc1.4d002a', // Main Profile Level 4.2 (1080p up to 60fps - standard across iOS & Android)
       'avc1.640028', // High Profile Level 4.0 (1080p @ 30fps)
       'avc1.64002a', // High Profile Level 4.2
+      'avc1.4d0033', // Main Profile Level 5.1 (high-end iOS devices e.g. iPhone 16 Pro Max)
+      'avc1.640033', // High Profile Level 5.1
       'avc1.420028', // Baseline Profile Level 4.0
+      'avc1.42002a', // Baseline Profile Level 4.2
       'avc1.4d001f', // Main Profile Level 3.1
       'avc1.42001f', // Baseline Profile Level 3.1
       'avc1.42E01E'  // Constrained Baseline
@@ -442,7 +446,15 @@ export class VideoExporter {
       (rawData[0] === 0 && rawData[1] === 0 && rawData[2] === 0 && rawData[3] === 1)
     );
 
-    if (!isAnnexB && meta?.decoderConfig?.description) {
+    // If stream is already length-prefixed AVCC (not Annex B start codes)
+    if (!isAnnexB) {
+      if (meta?.decoderConfig?.description) {
+        this.cachedDescription = meta.decoderConfig.description;
+      } else if (this.cachedDescription && (!meta || !meta.decoderConfig || !meta.decoderConfig.description)) {
+        meta = meta || {};
+        meta.decoderConfig = meta.decoderConfig || { codec: avcCodec };
+        meta.decoderConfig.description = this.cachedDescription;
+      }
       return { data: rawData, meta };
     }
 
@@ -534,6 +546,11 @@ export class VideoExporter {
       meta = meta || {};
       meta.decoderConfig = meta.decoderConfig || { codec: avcCodec };
       meta.decoderConfig.description = avcRecord;
+      this.cachedDescription = avcRecord;
+    } else if (this.cachedDescription && (!meta || !meta.decoderConfig || !meta.decoderConfig.description)) {
+      meta = meta || {};
+      meta.decoderConfig = meta.decoderConfig || { codec: avcCodec };
+      meta.decoderConfig.description = this.cachedDescription;
     }
 
     if (sampleNals.length === 0) {
@@ -575,9 +592,10 @@ export class VideoExporter {
     exportH = Math.floor(exportH / 2) * 2;
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
 
-    // Reset cached SPS/PPS for this export session
+    // Reset cached SPS/PPS/Description for this export session
     this.cachedSps = null;
     this.cachedPps = null;
+    this.cachedDescription = null;
 
     // Prepare DOM-attached offscreen canvas (prevents iOS WebKit GPU buffer suspension)
     this.setupExportCanvas(exportW, exportH);
@@ -595,32 +613,103 @@ export class VideoExporter {
     statEngine.textContent = 'WebCodecs (MP4 H.264)';
 
     try {
-      // 1. Check AudioEncoder support for AAC
-      let canEncodeAudio = false;
+      // 1. Prepare and pre-encode Audio (if enabled and fully supported by both AudioEncoder and AudioData)
+      const encodedAudioChunks = [];
       let audioTrackConfig = undefined;
 
-      if (includeAudio && project.audio && project.audio.enabled && !project.audio.muted && typeof window.AudioEncoder !== 'undefined') {
-        try {
-          const aCheck = await AudioEncoder.isConfigSupported({
-            codec: 'mp4a.40.2',
-            numberOfChannels: 2,
-            sampleRate: 44100,
-            bitrate: 128000
-          });
-          if (aCheck && aCheck.supported) {
-            canEncodeAudio = true;
-            audioTrackConfig = {
-              codec: 'aac',
-              numberOfChannels: 2,
-              sampleRate: 44100
-            };
+      if (includeAudio && project.audio && project.audio.enabled && !project.audio.muted) {
+        const hasAudioCodecs = typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
+        if (hasAudioCodecs) {
+          try {
+            if (!AudioSys.currentBuffer && project.audio) {
+              await AudioSys.loadTrack(project.audio);
+            }
+            const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
+            if (renderedBuffer && renderedBuffer.length > 0) {
+              const aCheck = await AudioEncoder.isConfigSupported({
+                codec: 'mp4a.40.2',
+                numberOfChannels: 2,
+                sampleRate: 44100,
+                bitrate: 128000
+              });
+              if (aCheck && aCheck.supported) {
+                const audioEncoder = new AudioEncoder({
+                  output: (chunk, meta) => {
+                    try {
+                      const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
+                        ? chunk.duration
+                        : Math.round((1024 / 44100) * 1000000);
+                      const data = new Uint8Array(chunk.byteLength);
+                      chunk.copyTo(data);
+                      encodedAudioChunks.push({
+                        data,
+                        type: chunk.type,
+                        timestamp: chunk.timestamp,
+                        duration: dur,
+                        meta
+                      });
+                    } catch (aErr) {
+                      console.warn('[Audio chunk error]', aErr);
+                    }
+                  },
+                  error: (err) => console.warn('[AudioEncoder error]', err)
+                });
+
+                audioEncoder.configure({
+                  codec: 'mp4a.40.2',
+                  numberOfChannels: 2,
+                  sampleRate: 44100,
+                  bitrate: 128000
+                });
+
+                const totalAudioSamples = renderedBuffer.length;
+                const left = renderedBuffer.getChannelData(0);
+                const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
+                const chunkSize = 1024;
+
+                for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
+                  const framesThisChunk = Math.min(chunkSize, totalAudioSamples - offset);
+                  const planarData = new Float32Array(framesThisChunk * 2);
+                  planarData.set(left.subarray(offset, offset + framesThisChunk), 0);
+                  planarData.set(right.subarray(offset, offset + framesThisChunk), framesThisChunk);
+
+                  const audioData = new AudioData({
+                    format: 'f32-planar',
+                    sampleRate: 44100,
+                    numberOfFrames: framesThisChunk,
+                    numberOfChannels: 2,
+                    timestamp: Math.round((offset / 44100) * 1000000),
+                    data: planarData
+                  });
+
+                  audioEncoder.encode(audioData);
+                  audioData.close();
+                }
+
+                await Promise.race([
+                  audioEncoder.flush(),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Audio flush timeout')), 5000))
+                ]);
+
+                if (encodedAudioChunks.length > 0) {
+                  audioTrackConfig = {
+                    codec: 'aac',
+                    numberOfChannels: 2,
+                    sampleRate: 44100
+                  };
+                }
+              }
+            }
+          } catch (audioErr) {
+            console.warn('[Audio pre-encoding failed/skipped]:', audioErr);
+            encodedAudioChunks.length = 0;
+            audioTrackConfig = undefined;
           }
-        } catch (e) {
-          canEncodeAudio = false;
         }
       }
 
       // 2. Initialize MP4 Muxer with FastStart & offset first timestamp behavior
+      // Note: audio is ONLY declared if audio chunks were ACTUALLY generated and verified!
       const muxer = new Mp4Muxer.Muxer({
         target: new Mp4Muxer.ArrayBufferTarget(),
         video: {
@@ -633,6 +722,13 @@ export class VideoExporter {
         fastStart: 'in-memory',
         firstTimestampBehavior: 'offset'
       });
+
+      // Write verified audio chunks into muxer
+      if (audioTrackConfig && encodedAudioChunks.length > 0) {
+        for (const ac of encodedAudioChunks) {
+          muxer.addAudioChunkRaw(ac.data, ac.type, ac.timestamp, ac.duration, ac.meta);
+        }
+      }
 
       // 3. Initialize VideoEncoder with robust chunk handling & duration safety
       const frameDurationUs = Math.round(1000000 / fps);
@@ -673,75 +769,54 @@ export class VideoExporter {
         }
       });
 
-      videoEncoder.configure({
-        codec: avcCodec,
-        width: exportW,
-        height: exportH,
-        bitrate: videoBitrate,
-        framerate: fps
-      });
+      // Configure VideoEncoder with fallback candidate profiles
+      const candidateCodecs = [
+        avcCodec,
+        'avc1.4d002a',
+        'avc1.640028',
+        'avc1.64002a',
+        'avc1.4d0033',
+        'avc1.420028',
+        'avc1.42001f'
+      ];
+      let isConfigured = false;
+      let lastConfigErr = null;
 
-      // 4. Encode Audio (if enabled and AudioEncoder supported)
-      let audioEncoder = null;
-      if (canEncodeAudio) {
+      for (const candidate of candidateCodecs) {
+        if (!candidate) continue;
         try {
-          const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
-          if (renderedBuffer && this.isExporting && !this.abortController.signal.aborted) {
-            audioEncoder = new AudioEncoder({
-              output: (chunk, meta) => {
-                try {
-                  const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
-                    ? chunk.duration
-                    : Math.round((1024 / 44100) * 1000000);
-                  const data = new Uint8Array(chunk.byteLength);
-                  chunk.copyTo(data);
-                  muxer.addAudioChunkRaw(data, chunk.type, chunk.timestamp, dur, meta);
-                } catch (aErr) {
-                  console.warn('[Muxer addAudioChunkRaw error]', aErr);
-                }
-              },
-              error: (err) => console.warn('[AudioEncoder error]', err)
+          videoEncoder.configure({
+            codec: candidate,
+            width: exportW,
+            height: exportH,
+            bitrate: videoBitrate,
+            framerate: fps
+          });
+          isConfigured = true;
+          avcCodec = candidate;
+          break;
+        } catch (err) {
+          try {
+            videoEncoder.configure({
+              codec: candidate,
+              width: exportW,
+              height: exportH
             });
-
-            audioEncoder.configure({
-              codec: 'mp4a.40.2',
-              numberOfChannels: 2,
-              sampleRate: 44100,
-              bitrate: 128000
-            });
-
-            const totalAudioSamples = renderedBuffer.length;
-            const left = renderedBuffer.getChannelData(0);
-            const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
-            const chunkSize = 1024;
-
-            for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
-              const framesThisChunk = Math.min(chunkSize, totalAudioSamples - offset);
-              const planarData = new Float32Array(framesThisChunk * 2);
-              planarData.set(left.subarray(offset, offset + framesThisChunk), 0);
-              planarData.set(right.subarray(offset, offset + framesThisChunk), framesThisChunk);
-
-              const audioData = new AudioData({
-                format: 'f32-planar',
-                sampleRate: 44100,
-                numberOfFrames: framesThisChunk,
-                numberOfChannels: 2,
-                timestamp: Math.round((offset / 44100) * 1000000),
-                data: planarData
-              });
-
-              audioEncoder.encode(audioData);
-              audioData.close();
-            }
-
-            await audioEncoder.flush();
+            isConfigured = true;
+            avcCodec = candidate;
+            break;
+          } catch (err2) {
+            lastConfigErr = err2;
+            console.warn(`[VideoEncoder configure failed for ${candidate}]`, err2);
           }
-        } catch (audioErr) {
-          console.warn('[Audio export skipped due to error]', audioErr);
         }
       }
 
-      // 5. Encode Video Frames
+      if (!isConfigured) {
+        throw new Error(lastConfigErr ? lastConfigErr.message : 'Hardware H.264 encoder configuration failed');
+      }
+
+      // 4. Encode Video Frames
       const totalFrames = Math.ceil(duration * fps);
       let lastFrameTimestampUs = -1;
 
@@ -771,16 +846,25 @@ export class VideoExporter {
             duration: frameDurationUs
           });
         } catch (e) {
-          videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
+          try {
+            videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
+          } catch (e2) {
+            const bitmap = await createImageBitmap(this.exportCanvas);
+            videoFrame = new VideoFrame(bitmap, { timestamp: timestampUs });
+            bitmap.close();
+          }
         }
 
         const isKey = frameIndex % (fps * 2) === 0;
         videoEncoder.encode(videoFrame, { keyFrame: isKey });
         videoFrame.close();
 
-        // Control memory queue backpressure
-        if (videoEncoder.encodeQueueSize > 5) {
-          await new Promise(r => setTimeout(r, 8));
+        // Control memory queue backpressure with while loop to avoid hardware queue saturation on iOS
+        while (videoEncoder.encodeQueueSize > 2) {
+          if (encoderError || this.abortController.signal.aborted) {
+            break;
+          }
+          await new Promise(r => setTimeout(r, 16));
         }
 
         if (frameIndex % 3 === 0 || frameIndex === totalFrames - 1) {
@@ -789,7 +873,16 @@ export class VideoExporter {
         }
       }
 
-      await videoEncoder.flush();
+      if (encoderError) {
+        throw new Error(`Video encoder error: ${encoderError.message || encoderError}`);
+      }
+
+      // Flush video encoder with 10-second safety timeout against iOS VideoToolbox freeze
+      await Promise.race([
+        videoEncoder.flush(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Video encoder flush timeout')), 10000))
+      ]);
+
       muxer.finalize();
 
       this.cleanupExportCanvas();
@@ -812,8 +905,8 @@ export class VideoExporter {
         Utils.showToast('Switching to standard recorder...', 'info', 2500);
         return this.exportWithMediaRecorder(options);
       }
-      this.cancelExport();
-      Utils.showToast(`Export failed: ${err.message}`, 'error', 5000);
+      this.cancelExport(false);
+      Utils.showToast(`Export failed: ${err.message || err}`, 'error', 7000);
     }
   }
 
@@ -1026,7 +1119,7 @@ export class VideoExporter {
     this.exportModal.querySelector('#stat-time').textContent = `${currentTime.toFixed(1)}s / ${duration.toFixed(1)}s`;
   }
 
-  cancelExport() {
+  cancelExport(showToast = true) {
     this.isExporting = false;
     if (this.abortController) {
       this.abortController.abort();
@@ -1040,7 +1133,9 @@ export class VideoExporter {
     this.cleanupExportCanvas();
     this.recordedChunks = [];
     this.showConfigView();
-    Utils.showToast('Export cancelled.', 'info');
+    if (showToast) {
+      Utils.showToast('Export cancelled.', 'info');
+    }
   }
 
   /**

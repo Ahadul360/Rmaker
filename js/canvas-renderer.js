@@ -25,6 +25,7 @@ export class CanvasRenderer {
     for (const pattern of Presets.patterns) {
       if (pattern.url) {
         const img = new Image();
+        img.crossOrigin = 'anonymous';
         this.patternImages.set(pattern.id, img);
         img.onload = () => {
           State.emit('stateRenderNeeded');
