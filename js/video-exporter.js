@@ -307,9 +307,9 @@ export class VideoExporter {
     // WebCodecs encodes frames directly from canvas without requiring MediaStream/MediaRecorder,
     // avoiding the known WebKit bug on iOS Safari where mixed canvas+audio MediaStreams fail.
     if (format === 'mp4' && hasWebCodecs) {
-      const isAvcSupported = await this.checkAvcSupport(options);
-      if (isAvcSupported) {
-        return this.exportWithWebCodecs(options);
+      const supportedAvcCodec = await this.checkAvcSupport(options);
+      if (supportedAvcCodec) {
+        return this.exportWithWebCodecs(options, supportedAvcCodec);
       }
     }
 
@@ -318,6 +318,10 @@ export class VideoExporter {
   }
 
   async checkAvcSupport(options) {
+    if (typeof VideoEncoder === 'undefined' || typeof VideoEncoder.isConfigSupported !== 'function') {
+      return null;
+    }
+
     const { resolution = '1080p', fps = 30 } = options;
     const project = State.project;
     const baseWidth = Presets.aspectRatios[project.aspectRatio]?.width || 1080;
@@ -325,64 +329,52 @@ export class VideoExporter {
     const scale = Presets.resolutions[resolution]?.scale || 1.0;
     let exportW = Math.round(baseWidth * scale);
     let exportH = Math.round(baseHeight * scale);
-    // Ensure even dimensions (required for H.264 Apple VideoToolbox HW encoding)
+    // Ensure even dimensions (required for H.264 / AVC hardware encoders)
     exportW = Math.floor(exportW / 2) * 2;
     exportH = Math.floor(exportH / 2) * 2;
 
     const bitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 4500000 : 2500000);
 
     const avcProfiles = [
-      'avc1.4d002a', // Main Level 4.2
-      'avc1.64002a', // High Level 4.2
-      'avc1.42002a', // Baseline Level 4.2
-      'avc1.640033', // High Level 5.1 (Standard 1080p on iOS 16+)
-      'avc1.4d0033', // Main Level 5.1
-      'avc1.420033', // Baseline Level 5.1
-      'avc1.640032', // High Level 5.0
-      'avc1.4d0032', // Main Level 5.0
-      'avc1.420032', // Baseline Level 5.0
-      'avc1.640028', // High Level 4.0
-      'avc1.4d0028', // Main Level 4.0
+      'avc1.42001f', // Baseline Level 3.1 (universal across mobile and desktop)
       'avc1.420028', // Baseline Level 4.0
-      'avc1.64001f', // High Level 3.1
       'avc1.4d001f', // Main Level 3.1
-      'avc1.42001f', // Baseline Level 3.1
+      'avc1.4d002a', // Main Level 4.2
+      'avc1.640028', // High Level 4.0
+      'avc1.64002a', // High Level 4.2
       'avc1.42E01E'  // Constrained Baseline
     ];
 
-    if (typeof VideoEncoder !== 'undefined' && typeof VideoEncoder.isConfigSupported === 'function') {
-      for (const codec of avcProfiles) {
-        try {
-          const res = await VideoEncoder.isConfigSupported({
-            codec,
-            width: exportW,
-            height: exportH,
-            bitrate,
-            framerate: fps
-          });
-          if (res && res.supported) {
-            return codec;
-          }
-        } catch (e) {}
-      }
-
-      // Fallback query with basic dimensions (some WebKit versions require omitting bitrate in query)
-      for (const codec of avcProfiles) {
-        try {
-          const res = await VideoEncoder.isConfigSupported({
-            codec,
-            width: exportW,
-            height: exportH
-          });
-          if (res && res.supported) {
-            return codec;
-          }
-        } catch (e) {}
-      }
+    for (const codec of avcProfiles) {
+      try {
+        const res = await VideoEncoder.isConfigSupported({
+          codec,
+          width: exportW,
+          height: exportH,
+          bitrate,
+          framerate: fps
+        });
+        if (res && res.supported) {
+          return codec;
+        }
+      } catch (e) {}
     }
 
-    // Default to Apple VideoToolbox's universal Main 4.2 codec
-    return 'avc1.4d002a';
+    // Secondary check without bitrate (some WebKit/Safari versions require omitting bitrate in query)
+    for (const codec of avcProfiles) {
+      try {
+        const res = await VideoEncoder.isConfigSupported({
+          codec,
+          width: exportW,
+          height: exportH
+        });
+        if (res && res.supported) {
+          return codec;
+        }
+      } catch (e) {}
+    }
+
+    return null;
   }
 
   /**
@@ -390,7 +382,7 @@ export class VideoExporter {
    * Generates true H.264/AAC MP4 with FastStart (moov atom at front) and exact duration.
    * Perfect for TikTok, Facebook Reels, YouTube Shorts & Instagram.
    */
-  async exportWithWebCodecs(options) {
+  async exportWithWebCodecs(options, avcCodec = 'avc1.42001f') {
     const { resolution = '1080p', fps = 30, includeAudio = true } = options;
     const project = State.project;
     const duration = project.duration;
@@ -403,8 +395,6 @@ export class VideoExporter {
     exportW = Math.floor(exportW / 2) * 2;
     exportH = Math.floor(exportH / 2) * 2;
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
-
-    const avcCodec = await this.checkAvcSupport(options) || 'avc1.4d002a';
 
     // Prepare DOM-attached offscreen canvas (prevents iOS WebKit GPU buffer suspension)
     this.setupExportCanvas(exportW, exportH);
@@ -461,18 +451,35 @@ export class VideoExporter {
         firstTimestampBehavior: 'offset'
       });
 
-      // 3. Initialize VideoEncoder with monotonic timestamp enforcement
-      let lastVideoTimestampUs = -1;
+      // 3. Initialize VideoEncoder with robust chunk handling & duration safety
+      const frameDurationUs = Math.round(1000000 / fps);
+      let lastChunkTimestampUs = -1;
       let encoderError = null;
+
       const videoEncoder = new VideoEncoder({
         output: (chunk, meta) => {
-          let ts = chunk.timestamp;
-          if (ts < 0) ts = 0;
-          if (ts <= lastVideoTimestampUs) {
-            ts = lastVideoTimestampUs + 1;
+          try {
+            let ts = Number.isFinite(chunk.timestamp) ? chunk.timestamp : (lastChunkTimestampUs + frameDurationUs);
+            if (ts < 0) ts = 0;
+            if (ts <= lastChunkTimestampUs) {
+              ts = lastChunkTimestampUs + 1;
+            }
+            lastChunkTimestampUs = ts;
+
+            // In Safari and some mobile browsers, chunk.duration is null.
+            // mp4-muxer requires a finite duration or it throws a TypeError.
+            const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
+              ? chunk.duration
+              : frameDurationUs;
+
+            const data = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(data);
+
+            muxer.addVideoChunkRaw(data, chunk.type, ts, dur, meta);
+          } catch (err) {
+            console.error('[Muxer addVideoChunkRaw error]', err);
+            encoderError = err;
           }
-          lastVideoTimestampUs = ts;
-          muxer.addVideoChunk(chunk, meta, ts);
         },
         error: (err) => {
           console.error('[VideoEncoder error]', err);
@@ -480,70 +487,78 @@ export class VideoExporter {
         }
       });
 
-      const encoderConfig = {
+      videoEncoder.configure({
         codec: avcCodec,
         width: exportW,
         height: exportH,
         bitrate: videoBitrate,
-        framerate: fps,
-        avc: { format: 'avc' }
-      };
-
-      try {
-        videoEncoder.configure(encoderConfig);
-      } catch (cfgErr) {
-        // Fallback without avc sub-dict if WebKit rejects it
-        delete encoderConfig.avc;
-        videoEncoder.configure(encoderConfig);
-      }
+        framerate: fps
+      });
 
       // 4. Encode Audio (if enabled and AudioEncoder supported)
       let audioEncoder = null;
       if (canEncodeAudio) {
-        const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
-        if (renderedBuffer && this.isExporting && !this.abortController.signal.aborted) {
-          audioEncoder = new AudioEncoder({
-            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-            error: (err) => console.warn('[AudioEncoder error]', err)
-          });
-
-          audioEncoder.configure({
-            codec: 'mp4a.40.2',
-            numberOfChannels: 2,
-            sampleRate: 44100,
-            bitrate: 128000
-          });
-
-          const totalAudioSamples = renderedBuffer.length;
-          const left = renderedBuffer.getChannelData(0);
-          const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
-          const chunkSize = 1024;
-
-          for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
-            const framesThisChunk = Math.min(chunkSize, totalAudioSamples - offset);
-            const planarData = new Float32Array(framesThisChunk * 2);
-            planarData.set(left.subarray(offset, offset + framesThisChunk), 0);
-            planarData.set(right.subarray(offset, offset + framesThisChunk), framesThisChunk);
-
-            const audioData = new AudioData({
-              format: 'f32-planar',
-              sampleRate: 44100,
-              numberOfFrames: framesThisChunk,
-              numberOfChannels: 2,
-              timestamp: Math.round((offset / 44100) * 1000000),
-              data: planarData
+        try {
+          const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
+          if (renderedBuffer && this.isExporting && !this.abortController.signal.aborted) {
+            audioEncoder = new AudioEncoder({
+              output: (chunk, meta) => {
+                try {
+                  const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
+                    ? chunk.duration
+                    : Math.round((1024 / 44100) * 1000000);
+                  const data = new Uint8Array(chunk.byteLength);
+                  chunk.copyTo(data);
+                  muxer.addAudioChunkRaw(data, chunk.type, chunk.timestamp, dur, meta);
+                } catch (aErr) {
+                  console.warn('[Muxer addAudioChunkRaw error]', aErr);
+                }
+              },
+              error: (err) => console.warn('[AudioEncoder error]', err)
             });
 
-            audioEncoder.encode(audioData);
-            audioData.close();
-          }
+            audioEncoder.configure({
+              codec: 'mp4a.40.2',
+              numberOfChannels: 2,
+              sampleRate: 44100,
+              bitrate: 128000
+            });
 
-          await audioEncoder.flush();
+            const totalAudioSamples = renderedBuffer.length;
+            const left = renderedBuffer.getChannelData(0);
+            const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
+            const chunkSize = 1024;
+
+            for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
+              const framesThisChunk = Math.min(chunkSize, totalAudioSamples - offset);
+              const planarData = new Float32Array(framesThisChunk * 2);
+              planarData.set(left.subarray(offset, offset + framesThisChunk), 0);
+              planarData.set(right.subarray(offset, offset + framesThisChunk), framesThisChunk);
+
+              const audioData = new AudioData({
+                format: 'f32-planar',
+                sampleRate: 44100,
+                numberOfFrames: framesThisChunk,
+                numberOfChannels: 2,
+                timestamp: Math.round((offset / 44100) * 1000000),
+                data: planarData
+              });
+
+              audioEncoder.encode(audioData);
+              audioData.close();
+            }
+
+            await audioEncoder.flush();
+          }
+        } catch (audioErr) {
+          console.warn('[Audio export skipped due to error]', audioErr);
         }
       }
 
       // 5. Encode Video Frames
       const totalFrames = Math.ceil(duration * fps);
+      let lastFrameTimestampUs = -1;
+
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
         if (!this.isExporting || this.abortController.signal.aborted) {
           this.cleanupExportCanvas();
@@ -557,26 +572,20 @@ export class VideoExporter {
         const currentTime = frameIndex / fps;
         this.exportRenderer.renderFrame(currentTime, this.exportCanvas, { isExport: true });
 
-        const timestampUs = Math.round(currentTime * 1000000);
-        let videoFrame = null;
+        let timestampUs = Math.round(currentTime * 1000000);
+        if (frameIndex > 0 && timestampUs <= lastFrameTimestampUs) {
+          timestampUs = lastFrameTimestampUs + 1;
+        }
+        lastFrameTimestampUs = timestampUs;
 
-        // Construct VideoFrame safely with alpha discard and ImageBitmap fallback for iOS WebKit
+        let videoFrame;
         try {
           videoFrame = new VideoFrame(this.exportCanvas, {
             timestamp: timestampUs,
-            alpha: 'discard'
+            duration: frameDurationUs
           });
-        } catch (vfErr) {
-          try {
-            const bmp = await createImageBitmap(this.exportCanvas);
-            videoFrame = new VideoFrame(bmp, {
-              timestamp: timestampUs,
-              alpha: 'discard'
-            });
-            bmp.close();
-          } catch (bmpErr) {
-            videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
-          }
+        } catch (e) {
+          videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
         }
 
         const isKey = frameIndex % (fps * 2) === 0;
@@ -607,11 +616,14 @@ export class VideoExporter {
       Utils.showToast('Reel video exported in MP4 format (Social Media Ready)!', 'success');
     } catch (err) {
       console.error('WebCodecs export failed:', err);
+      const canCapture = typeof HTMLCanvasElement !== 'undefined' &&
+        typeof HTMLCanvasElement.prototype.captureStream === 'function';
       this.cleanupExportCanvas();
+
       // Only fallback to MediaRecorder if canvas.captureStream actually exists on this device
-      const canCapture = this.exportCanvas && typeof this.exportCanvas.captureStream === 'function';
       if (this.isExporting && !this.abortController.signal.aborted && canCapture) {
         console.warn('Falling back to MediaRecorder...');
+        Utils.showToast('Switching to standard recorder...', 'info', 2500);
         return this.exportWithMediaRecorder(options);
       }
       this.cancelExport();
@@ -631,8 +643,10 @@ export class VideoExporter {
     const baseHeight = Presets.aspectRatios[project.aspectRatio].height;
     const scale = Presets.resolutions[resolution].scale;
 
-    const exportW = Math.round(baseWidth * scale);
-    const exportH = Math.round(baseHeight * scale);
+    let exportW = Math.round(baseWidth * scale);
+    let exportH = Math.round(baseHeight * scale);
+    exportW = Math.floor(exportW / 2) * 2;
+    exportH = Math.floor(exportH / 2) * 2;
 
     // Determine supported MIME type
     let mimeType = '';
