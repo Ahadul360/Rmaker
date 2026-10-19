@@ -320,7 +320,7 @@ class StateManager {
 
   loadProject(projectData) {
     this.project = Utils.deepClone(projectData);
-    if (this.project && this.project.socialHandle && (this.project.socialHandle.text === '@yourname' || this.project.socialHandle.text === '@yourhandle' || this.project.socialHandle.text === '@ahadul.com')) {
+    if (this.project && this.project.socialHandle && (this.project.socialHandle.text === '@yourname' || this.project.socialHandle.text === '@yourhandle' || this.project.socialHandle.text === '@ahadul.com' || this.project.socialHandle.text.startsWith('@'))) {
       this.project.socialHandle.text = 'ahadul.com';
     }
     this.selectedElementId = null;
@@ -348,6 +348,9 @@ class StateManager {
     this.project.background = Utils.deepClone(template.background);
     this.project.elements = Utils.deepClone(template.elements);
     this.project.socialHandle = Utils.deepClone(template.socialHandle);
+    if (this.project.socialHandle) {
+      this.project.socialHandle.text = 'ahadul.com';
+    }
     this.project.audio = Utils.deepClone(template.audio);
     this.project.updatedAt = Date.now();
 
