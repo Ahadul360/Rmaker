@@ -532,6 +532,11 @@ var esds = (track) => {
     const b0 = (2 << 3) | (freqIdx >> 1);
     const b1 = ((freqIdx & 1) << 7) | (channels << 3);
     description = new Uint8Array([b0, b1]);
+  } else if (description.byteLength > 2 && (description[0] >> 3) === 2) {
+    // Extradata > 2 bytes from FFmpeg contains SBR extension markers (0x2b7) which cause
+    // Apple AudioToolbox / iOS AVFoundation to expect SBR frames and output silence.
+    // For standard AAC-LC, truncate to canonical 2 bytes.
+    description = description.subarray(0, 2);
   }
 
   return fullBox("esds", 0, 0, [

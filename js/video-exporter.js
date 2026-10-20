@@ -624,15 +624,19 @@ export class VideoExporter {
       const ctx = wasm._init_encoder(channels, sampleRate, bitrate);
       if (!ctx) {
         console.warn('[VideoExporter] WASM AAC _init_encoder failed');
-        return { chunks: [], sampleRate };
+        return { chunks: [], sampleRate, error: new Error('WASM AAC _init_encoder returned null') };
       }
 
       const frameSize = wasm._get_encoder_frame_size(ctx) || 1024;
-      const ascPtr = wasm._get_encoder_extradata(ctx);
-      const ascSize = wasm._get_encoder_extradata_size(ctx);
-      const asc = (ascPtr && ascSize > 0)
-        ? new Uint8Array(wasm.HEAPU8.buffer, ascPtr, ascSize).slice(0)
-        : new Uint8Array([0x12, 0x10]); // Canonical 44.1kHz stereo fallback
+      
+      // Strict canonical 2-byte AudioSpecificConfig for MPEG-4 AAC-LC Stereo (ISO/IEC 14496-3)
+      // Do NOT use FFmpeg's 5-byte extradata: FFmpeg appends 3-byte SBR sync extension (0x2b7)
+      // which causes Apple AudioToolbox on iOS / AVFoundation to expect SBR and output silence.
+      const freqIdx = sampleRate === 48000 ? 3 : (sampleRate === 44100 ? 4 : 4);
+      const asc = new Uint8Array([
+        (2 << 3) | (freqIdx >> 1),
+        ((freqIdx & 1) << 7) | (channels << 3)
+      ]);
 
       const totalSamples = renderedBuffer.length;
       const left = renderedBuffer.getChannelData(0);
@@ -693,8 +697,8 @@ export class VideoExporter {
       wasm._close_encoder(ctx);
       return { chunks: audioChunks, sampleRate, asc };
     } catch (err) {
-      console.warn('[VideoExporter] encodeAudioWithWasm failed:', err);
-      return { chunks: [], sampleRate };
+      console.error('[VideoExporter] encodeAudioWithWasm failed:', err);
+      return { chunks: [], sampleRate, error: err };
     }
   }
 
@@ -780,99 +784,99 @@ export class VideoExporter {
               targetSampleRate = supportedAudioConfig.sampleRate;
             }
 
-            const renderedBuffer = await AudioSys.renderOfflineAudio(duration, targetSampleRate);
-            if (renderedBuffer && renderedBuffer.length > 0) {
-              let audioEncoderError = null;
+            // Only attempt WebCodecs AudioEncoder if a supported config was confirmed
+            if (supportedAudioConfig) {
+              try {
+                const renderedBuffer = await AudioSys.renderOfflineAudio(duration, targetSampleRate);
+                if (renderedBuffer && renderedBuffer.length > 0) {
+                  let audioEncoderError = null;
 
-              const audioEncoder = new AudioEncoder({
-                output: (chunk, meta) => {
-                  try {
-                    const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
-                      ? chunk.duration
-                      : Math.round((1024 / targetSampleRate) * 1000000);
-                    const data = new Uint8Array(chunk.byteLength);
-                    chunk.copyTo(data);
+                  const audioEncoder = new AudioEncoder({
+                    output: (chunk, meta) => {
+                      try {
+                        const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
+                          ? chunk.duration
+                          : Math.round((1024 / targetSampleRate) * 1000000);
+                        const data = new Uint8Array(chunk.byteLength);
+                        chunk.copyTo(data);
 
-                    let cleanMeta = meta;
-                    if (meta && meta.decoderConfig) {
-                      cleanMeta = { ...meta, decoderConfig: { ...meta.decoderConfig } };
-                      const desc = meta.decoderConfig.description;
-                      if (desc) {
-                        if (desc instanceof Uint8Array) {
-                          cleanMeta.decoderConfig.description = desc;
-                        } else if (desc instanceof DataView || (desc.buffer && typeof desc.byteOffset === 'number')) {
-                          cleanMeta.decoderConfig.description = new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
-                        } else if (desc instanceof ArrayBuffer) {
-                          cleanMeta.decoderConfig.description = new Uint8Array(desc);
+                        let cleanMeta = meta;
+                        if (meta && meta.decoderConfig) {
+                          cleanMeta = { ...meta, decoderConfig: { ...meta.decoderConfig } };
+                          const desc = meta.decoderConfig.description;
+                          if (desc) {
+                            if (desc instanceof Uint8Array) {
+                              cleanMeta.decoderConfig.description = desc;
+                            } else if (desc instanceof DataView || (desc.buffer && typeof desc.byteOffset === 'number')) {
+                              cleanMeta.decoderConfig.description = new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
+                            } else if (desc instanceof ArrayBuffer) {
+                              cleanMeta.decoderConfig.description = new Uint8Array(desc);
+                            }
+                          }
                         }
+
+                        encodedAudioChunks.push({
+                          data,
+                          type: chunk.type || 'key',
+                          timestamp: Math.max(0, Number.isFinite(chunk.timestamp) ? chunk.timestamp : (encodedAudioChunks.length * dur)),
+                          duration: dur,
+                          meta: cleanMeta
+                        });
+                      } catch (aErr) {
+                        console.warn('[VideoExporter] Audio chunk copy error:', aErr);
                       }
+                    },
+                    error: (err) => {
+                      console.warn('[VideoExporter] AudioEncoder error:', err);
+                      audioEncoderError = err;
+                    }
+                  });
+
+                  try {
+                    audioEncoder.configure(supportedAudioConfig);
+                  } catch (cfgErr) {
+                    audioEncoderError = cfgErr;
+                  }
+
+                  if (!audioEncoderError) {
+                    const totalAudioSamples = renderedBuffer.length;
+                    const left = renderedBuffer.getChannelData(0);
+                    const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
+                    const chunkSize = 1024;
+
+                    for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
+                      if (audioEncoderError) break;
+                      const framesAvailable = Math.min(chunkSize, totalAudioSamples - offset);
+
+                      // Exact 1024 frames per channel for strict Apple AudioToolbox AAC-LC compliance
+                      const planarData = new Float32Array(chunkSize * 2);
+                      planarData.set(left.subarray(offset, offset + framesAvailable), 0);
+                      planarData.set(right.subarray(offset, offset + framesAvailable), chunkSize);
+
+                      const audioData = new AudioData({
+                        format: 'f32-planar',
+                        sampleRate: targetSampleRate,
+                        numberOfFrames: chunkSize,
+                        numberOfChannels: 2,
+                        timestamp: Math.round((offset / targetSampleRate) * 1000000),
+                        data: planarData
+                      });
+
+                      audioEncoder.encode(audioData);
+                      audioData.close();
                     }
 
-                    encodedAudioChunks.push({
-                      data,
-                      type: chunk.type || 'key',
-                      timestamp: Math.max(0, Number.isFinite(chunk.timestamp) ? chunk.timestamp : (encodedAudioChunks.length * dur)),
-                      duration: dur,
-                      meta: cleanMeta
-                    });
-                  } catch (aErr) {
-                    console.warn('[VideoExporter] Audio chunk copy error:', aErr);
+                    if (!audioEncoderError) {
+                      await Promise.race([
+                        audioEncoder.flush(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Audio flush timeout')), 10000))
+                      ]);
+                    }
                   }
-                },
-                error: (err) => {
-                  console.warn('[VideoExporter] AudioEncoder error:', err);
-                  audioEncoderError = err;
                 }
-              });
-
-              // Configure AudioEncoder (try with bitrate, then without bitrate for strict AudioToolbox)
-              try {
-                audioEncoder.configure(supportedAudioConfig || {
-                  codec: 'mp4a.40.2',
-                  numberOfChannels: 2,
-                  sampleRate: targetSampleRate,
-                  bitrate: 128000
-                });
-              } catch (cfgErr) {
-                audioEncoder.configure({
-                  codec: 'mp4a.40.2',
-                  numberOfChannels: 2,
-                  sampleRate: targetSampleRate
-                });
-              }
-
-              const totalAudioSamples = renderedBuffer.length;
-              const left = renderedBuffer.getChannelData(0);
-              const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
-              const chunkSize = 1024;
-
-              for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
-                if (audioEncoderError) break;
-                const framesAvailable = Math.min(chunkSize, totalAudioSamples - offset);
-
-                // Exact 1024 frames per channel for strict Apple AudioToolbox AAC-LC compliance
-                const planarData = new Float32Array(chunkSize * 2);
-                planarData.set(left.subarray(offset, offset + framesAvailable), 0);
-                planarData.set(right.subarray(offset, offset + framesAvailable), chunkSize);
-
-                const audioData = new AudioData({
-                  format: 'f32-planar',
-                  sampleRate: targetSampleRate,
-                  numberOfFrames: chunkSize,
-                  numberOfChannels: 2,
-                  timestamp: Math.round((offset / targetSampleRate) * 1000000),
-                  data: planarData
-                });
-
-                audioEncoder.encode(audioData);
-                audioData.close();
-              }
-
-              if (!audioEncoderError) {
-                await Promise.race([
-                  audioEncoder.flush(),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Audio flush timeout')), 10000))
-                ]);
+              } catch (aeTryErr) {
+                console.warn('[VideoExporter] WebCodecs AudioEncoder attempt failed, will use WebAssembly AAC fallback:', aeTryErr);
+                encodedAudioChunks.length = 0;
               }
             }
           }
@@ -888,7 +892,12 @@ export class VideoExporter {
                 encodedAudioChunks.push(...wasmRes.chunks);
                 targetSampleRate = wasmRes.sampleRate || 44100;
                 console.log(`[VideoExporter] WebAssembly AAC encoding complete: ${encodedAudioChunks.length} chunks generated.`);
+              } else if (wasmRes && wasmRes.error) {
+                console.error('[VideoExporter] WebAssembly AAC encoding failed:', wasmRes.error);
+                throw new Error('WebAssembly AAC audio encoding failed: ' + (wasmRes.error.message || wasmRes.error));
               }
+            } else {
+              throw new Error('Offline audio rendering produced empty buffer.');
             }
           }
 
@@ -901,14 +910,11 @@ export class VideoExporter {
             audioStatusMsg = `AAC Audio (${encodedAudioChunks.length} chunks, ${targetSampleRate}Hz)`;
             console.log(`[VideoExporter] Successfully prepared ${audioStatusMsg}`);
           } else {
-            audioStatusMsg = 'No audio chunks generated';
-            console.warn('[VideoExporter] No audio chunks generated');
+            throw new Error('Audio was enabled but no audio packets could be produced.');
           }
         } catch (audioErr) {
-          console.warn('[VideoExporter] Audio preparation error:', audioErr);
-          encodedAudioChunks.length = 0;
-          audioTrackConfig = undefined;
-          audioStatusMsg = 'Audio error: ' + (audioErr.message || audioErr);
+          console.error('[VideoExporter] Audio preparation error:', audioErr);
+          throw audioErr;
         }
       } else {
         audioStatusMsg = (project.audio && project.audio.muted) ? 'Muted' : 'Disabled';
