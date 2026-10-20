@@ -870,6 +870,14 @@ export class VideoExporter {
       const totalFrames = Math.ceil(duration * fps);
       let lastFrameTimestampUs = -1;
 
+      // Verify canvas origin cleanliness before encoding
+      try {
+        const testCtx = this.exportCanvas.getContext('2d');
+        testCtx.getImageData(0, 0, 1, 1);
+      } catch (cleanErr) {
+        console.warn('[VideoExporter] Canvas origin-clean check warning:', cleanErr);
+      }
+
       for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
         if (!this.isExporting || this.abortController.signal.aborted) {
           this.cleanupExportCanvas();
@@ -900,8 +908,12 @@ export class VideoExporter {
           try {
             videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
           } catch (e2) {
-            bitmap = await createImageBitmap(this.exportCanvas);
-            videoFrame = new VideoFrame(bitmap, { timestamp: timestampUs });
+            try {
+              bitmap = await createImageBitmap(this.exportCanvas);
+              videoFrame = new VideoFrame(bitmap, { timestamp: timestampUs });
+            } catch (e3) {
+              throw new Error(`Frame creation failed at ${currentTime.toFixed(2)}s: ${e3.message || e3}`);
+            }
           }
         }
 

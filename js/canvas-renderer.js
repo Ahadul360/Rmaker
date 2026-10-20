@@ -8,6 +8,7 @@
 import { Utils } from './utils.js';
 import { State } from './state.js';
 import { Presets } from './presets.js';
+import { PatternGenerator } from './pattern-generator.js';
 
 export class CanvasRenderer {
   constructor(canvasElement) {
@@ -17,13 +18,17 @@ export class CanvasRenderer {
     this.bgImages = new Map();
     this.renderedBounds = new Map(); // id -> { x, y, width, height, rotation }
 
-    // Preload SVG pattern images
+    // Preload origin-clean pattern tiles
     this.preloadPatterns();
   }
 
   preloadPatterns() {
     for (const pattern of Presets.patterns) {
-      if (pattern.url) {
+      if (!pattern.id || pattern.id === 'none') continue;
+      const tile = PatternGenerator.getTile(pattern.id);
+      if (tile) {
+        this.patternImages.set(pattern.id, tile);
+      } else if (pattern.url) {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         this.patternImages.set(pattern.id, img);
@@ -146,6 +151,7 @@ export class CanvasRenderer {
         let img = this.bgImages.get(bg.imageSrc);
         if (!img) {
           img = new Image();
+          img.crossOrigin = 'anonymous';
           this.bgImages.set(bg.imageSrc, img);
           img.onload = () => {
             State.emit('stateRenderNeeded');
@@ -189,7 +195,11 @@ export class CanvasRenderer {
           }
         }
 
-        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        try {
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        } catch (drawErr) {
+          console.warn('[CanvasRenderer] Image draw error:', drawErr);
+        }
         ctx.restore();
 
         // Optional image tint overlay
@@ -203,27 +213,41 @@ export class CanvasRenderer {
     }
   }
 
-    // Pattern Overlay
+    // Pattern Overlay - rendered using 100% origin-clean native Canvas 2D tiles
     if (bg.pattern && bg.pattern !== 'none') {
-      const patternImg = this.patternImages.get(bg.pattern);
-      if (patternImg && patternImg.complete && patternImg.naturalWidth > 0) {
+      const patternColor = bg.patternColor || '#685B53';
+      let patternImg = PatternGenerator.getTile(bg.pattern, patternColor);
+      if (!patternImg) {
+        patternImg = this.patternImages.get(bg.pattern);
+      }
+
+      const isReady = patternImg && (
+        (patternImg instanceof HTMLCanvasElement && patternImg.width > 0) ||
+        (patternImg.complete && patternImg.naturalWidth > 0)
+      );
+
+      if (isReady) {
         ctx.save();
         ctx.globalAlpha = bg.patternOpacity || 0.35;
         if (bg.patternBlend) {
           ctx.globalCompositeOperation = bg.patternBlend;
         }
 
-        const pattern = ctx.createPattern(patternImg, 'repeat');
-        if (pattern) {
-          const scale = bg.patternScale || 1.0;
-          if (typeof DOMMatrix !== 'undefined' && scale !== 1.0) {
-            const matrix = new DOMMatrix();
-            matrix.scaleSelf(scale, scale);
-            if (bg.patternRotation) matrix.rotateSelf(bg.patternRotation);
-            pattern.setTransform(matrix);
+        try {
+          const pattern = ctx.createPattern(patternImg, 'repeat');
+          if (pattern) {
+            const scale = bg.patternScale || 1.0;
+            if (typeof DOMMatrix !== 'undefined' && scale !== 1.0) {
+              const matrix = new DOMMatrix();
+              matrix.scaleSelf(scale, scale);
+              if (bg.patternRotation) matrix.rotateSelf(bg.patternRotation);
+              pattern.setTransform(matrix);
+            }
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, width, height);
           }
-          ctx.fillStyle = pattern;
-          ctx.fillRect(0, 0, width, height);
+        } catch (patErr) {
+          console.warn('[CanvasRenderer] Pattern draw error:', patErr);
         }
         ctx.restore();
       }
