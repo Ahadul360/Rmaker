@@ -655,90 +655,132 @@ export class VideoExporter {
         const hasAudioCodecs = typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
         if (hasAudioCodecs) {
           try {
-            if (!AudioSys.currentBuffer && project.audio) {
+            const currentTrackKey = project.audio.trackId || project.audio.sourceUrl;
+            if (!AudioSys.currentBuffer || AudioSys.currentTrackId !== currentTrackKey) {
               await AudioSys.loadTrack(project.audio);
             }
-            const renderedBuffer = await AudioSys.renderOfflineAudio(duration, 44100);
-            if (renderedBuffer && renderedBuffer.length > 0) {
-              const aCheck = await AudioEncoder.isConfigSupported({
+
+            // Determine supported AAC sample rate (test 44100Hz, then 48000Hz)
+            let targetSampleRate = 44100;
+            let aCheck = null;
+            try {
+              aCheck = await AudioEncoder.isConfigSupported({
                 codec: 'mp4a.40.2',
                 numberOfChannels: 2,
                 sampleRate: 44100,
                 bitrate: 128000
               });
-              if (aCheck && aCheck.supported) {
-                const audioEncoder = new AudioEncoder({
-                  output: (chunk, meta) => {
-                    try {
-                      const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
-                        ? chunk.duration
-                        : Math.round((1024 / 44100) * 1000000);
-                      const data = new Uint8Array(chunk.byteLength);
-                      chunk.copyTo(data);
-                      encodedAudioChunks.push({
-                        data,
-                        type: chunk.type,
-                        timestamp: chunk.timestamp,
-                        duration: dur,
-                        meta
-                      });
-                    } catch (aErr) {
-                      console.warn('[Audio chunk error]', aErr);
-                    }
-                  },
-                  error: (err) => console.warn('[AudioEncoder error]', err)
-                });
+            } catch (e) {}
 
-                audioEncoder.configure({
+            if (!aCheck || !aCheck.supported) {
+              try {
+                const aCheck48 = await AudioEncoder.isConfigSupported({
                   codec: 'mp4a.40.2',
                   numberOfChannels: 2,
-                  sampleRate: 44100,
+                  sampleRate: 48000,
                   bitrate: 128000
                 });
-
-                const totalAudioSamples = renderedBuffer.length;
-                const left = renderedBuffer.getChannelData(0);
-                const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
-                const chunkSize = 1024;
-
-                for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
-                  const framesThisChunk = Math.min(chunkSize, totalAudioSamples - offset);
-                  const planarData = new Float32Array(framesThisChunk * 2);
-                  planarData.set(left.subarray(offset, offset + framesThisChunk), 0);
-                  planarData.set(right.subarray(offset, offset + framesThisChunk), framesThisChunk);
-
-                  const audioData = new AudioData({
-                    format: 'f32-planar',
-                    sampleRate: 44100,
-                    numberOfFrames: framesThisChunk,
-                    numberOfChannels: 2,
-                    timestamp: Math.round((offset / 44100) * 1000000),
-                    data: planarData
-                  });
-
-                  audioEncoder.encode(audioData);
-                  audioData.close();
+                if (aCheck48 && aCheck48.supported) {
+                  targetSampleRate = 48000;
+                  aCheck = aCheck48;
                 }
+              } catch (e) {}
+            }
 
-                await Promise.race([
-                  audioEncoder.flush(),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Audio flush timeout')), 5000))
-                ]);
+            const renderedBuffer = await AudioSys.renderOfflineAudio(duration, targetSampleRate);
+            if (renderedBuffer && renderedBuffer.length > 0 && aCheck && aCheck.supported) {
+              const audioEncoder = new AudioEncoder({
+                output: (chunk, meta) => {
+                  try {
+                    const dur = (Number.isFinite(chunk.duration) && chunk.duration > 0)
+                      ? chunk.duration
+                      : Math.round((1024 / targetSampleRate) * 1000000);
+                    const data = new Uint8Array(chunk.byteLength);
+                    chunk.copyTo(data);
 
-                if (encodedAudioChunks.length > 0) {
-                  audioTrackConfig = {
-                    codec: 'aac',
-                    numberOfChannels: 2,
-                    sampleRate: 44100
-                  };
-                }
+                    let cleanMeta = meta;
+                    if (meta && meta.decoderConfig) {
+                      cleanMeta = { ...meta, decoderConfig: { ...meta.decoderConfig } };
+                      const desc = meta.decoderConfig.description;
+                      if (desc) {
+                        if (desc instanceof Uint8Array) {
+                          cleanMeta.decoderConfig.description = desc;
+                        } else if (desc instanceof DataView || (desc.buffer && typeof desc.byteOffset === 'number')) {
+                          cleanMeta.decoderConfig.description = new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
+                        } else if (desc instanceof ArrayBuffer) {
+                          cleanMeta.decoderConfig.description = new Uint8Array(desc);
+                        }
+                      }
+                    }
+
+                    encodedAudioChunks.push({
+                      data,
+                      type: chunk.type,
+                      timestamp: chunk.timestamp,
+                      duration: dur,
+                      meta: cleanMeta
+                    });
+                  } catch (aErr) {
+                    console.warn('[VideoExporter] Audio chunk copy error:', aErr);
+                  }
+                },
+                error: (err) => console.warn('[VideoExporter] AudioEncoder error:', err)
+              });
+
+              audioEncoder.configure({
+                codec: 'mp4a.40.2',
+                numberOfChannels: 2,
+                sampleRate: targetSampleRate,
+                bitrate: 128000
+              });
+
+              const totalAudioSamples = renderedBuffer.length;
+              const left = renderedBuffer.getChannelData(0);
+              const right = renderedBuffer.numberOfChannels > 1 ? renderedBuffer.getChannelData(1) : left;
+              const chunkSize = 1024;
+
+              for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
+                const framesAvailable = Math.min(chunkSize, totalAudioSamples - offset);
+                
+                // Allocate exact 1024 frames per channel for strict Apple AudioToolbox AAC-LC compliance
+                const planarData = new Float32Array(chunkSize * 2);
+                planarData.set(left.subarray(offset, offset + framesAvailable), 0);
+                planarData.set(right.subarray(offset, offset + framesAvailable), chunkSize);
+
+                const audioData = new AudioData({
+                  format: 'f32-planar',
+                  sampleRate: targetSampleRate,
+                  numberOfFrames: chunkSize,
+                  numberOfChannels: 2,
+                  timestamp: Math.round((offset / targetSampleRate) * 1000000),
+                  data: planarData
+                });
+
+                audioEncoder.encode(audioData);
+                audioData.close();
+              }
+
+              await Promise.race([
+                audioEncoder.flush(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Audio flush timeout')), 10000))
+              ]);
+
+              if (encodedAudioChunks.length > 0) {
+                audioTrackConfig = {
+                  codec: 'aac',
+                  numberOfChannels: 2,
+                  sampleRate: targetSampleRate
+                };
+                console.log(`[VideoExporter] Encoded ${encodedAudioChunks.length} AAC audio chunks (${targetSampleRate}Hz)`);
               }
             }
           } catch (audioErr) {
-            console.warn('[Audio pre-encoding failed/skipped]:', audioErr);
+            console.warn('[VideoExporter] Audio pre-encoding failed/skipped:', audioErr);
             encodedAudioChunks.length = 0;
             audioTrackConfig = undefined;
           }
+        } else {
+          console.warn('[VideoExporter] AudioEncoder is not supported in this browser version');
         }
       }
 

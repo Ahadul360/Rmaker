@@ -514,7 +514,26 @@ var soundSampleDescription = (compressionType, track) => box(compressionType, [
   AUDIO_CODEC_TO_CONFIGURATION_BOX[track.info.codec](track)
 ]);
 var esds = (track) => {
-  let description = new Uint8Array(track.info.decoderConfig.description);
+  const desc = track.info.decoderConfig?.description;
+  let description = null;
+  if (desc instanceof Uint8Array && desc.byteLength > 0) {
+    description = desc;
+  } else if ((desc instanceof DataView || (desc && desc.buffer instanceof ArrayBuffer)) && desc.byteLength > 0) {
+    description = new Uint8Array(desc.buffer, desc.byteOffset || 0, desc.byteLength);
+  } else if (desc instanceof ArrayBuffer && desc.byteLength > 0) {
+    description = new Uint8Array(desc);
+  }
+
+  // Fallback to canonical AAC-LC AudioSpecificConfig if missing or empty
+  if (!description || description.byteLength === 0) {
+    const sRate = track.info.sampleRate || 44100;
+    const freqIdx = sRate === 48000 ? 3 : (sRate === 44100 ? 4 : 4);
+    const channels = track.info.numberOfChannels || 2;
+    const b0 = (2 << 3) | (freqIdx >> 1);
+    const b1 = ((freqIdx & 1) << 7) | (channels << 3);
+    description = new Uint8Array([b0, b1]);
+  }
+
   return fullBox("esds", 0, 0, [
     // https://stackoverflow.com/a/54803118
     u32(58753152),
