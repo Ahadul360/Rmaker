@@ -93,8 +93,8 @@ export class BackgroundEditor {
           <summary>Custom Local Image Background</summary>
           <div class="accordion-content">
             <div class="form-group">
-              <label class="file-drop-zone" id="bg-drop-zone">
-                <input type="file" id="input-bg-image-file" accept="image/*" style="display:none;" />
+              <label class="file-drop-zone" for="input-bg-image-file" id="bg-drop-zone" role="button" tabindex="0">
+                <input type="file" id="input-bg-image-file" class="sr-only-file-input" accept="image/*" />
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 <span>Click to Upload Local Image</span>
               </label>

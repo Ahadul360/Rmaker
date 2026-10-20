@@ -872,14 +872,37 @@ class ReelApp {
       }
     });
 
+    const labelImportAudio = document.getElementById('label-import-audio');
+    if (labelImportAudio && inputFile) {
+      const triggerFilePicker = (e) => {
+        if (e.target !== inputFile) {
+          e.preventDefault();
+          inputFile.click();
+        }
+      };
+      labelImportAudio.addEventListener('click', triggerFilePicker);
+      labelImportAudio.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inputFile.click();
+        }
+      });
+    }
+
     inputFile.addEventListener('change', async (e) => {
-      await AudioSys.unlockAudioContext();
-      const file = e.target.files[0];
-      if (file) {
-        await AudioSys.importLocalAudioFile(file);
-        this.syncAudioUI();
+      try {
+        await AudioSys.unlockAudioContext();
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          await AudioSys.importLocalAudioFile(file);
+          this.syncAudioUI();
+        }
+      } catch (importErr) {
+        console.warn('Audio input error:', importErr);
+        Utils.showToast(`Import error: ${importErr.message || importErr}`, 'error');
+      } finally {
+        inputFile.value = '';
       }
-      inputFile.value = '';
     });
 
     if (btnRemoveImported) {

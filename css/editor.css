@@ -500,11 +500,30 @@
   cursor: pointer;
   text-align: center;
   transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .file-drop-zone:hover {
   border-color: var(--accent);
   color: var(--text-primary);
   background: rgba(139, 124, 255, 0.08);
+}
+.file-drop-zone input[type="file"],
+.file-drop-zone .sr-only-file-input {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  z-index: 5 !important;
+  font-size: 0 !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: auto !important;
 }
 
 /* Template Cards Grid */

@@ -357,10 +357,10 @@
             </div>
 
             <div class="form-group">
-              <label class="file-drop-zone">
-                <input type="file" id="input-audio-file" accept="audio/*" style="display:none;" />
+              <label class="file-drop-zone" for="input-audio-file" id="label-import-audio" role="button" tabindex="0">
+                <input type="file" id="input-audio-file" class="sr-only-file-input" accept="audio/*,.mp3,.wav,.m4a,.aac,.caf,.flac,audio/mp4,audio/x-m4a,video/mp4" />
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                <span>Import Local Audio File (MP3, WAV)</span>
+                <span>Import Local Audio File (MP3, WAV, M4A)</span>
               </label>
             </div>
 

@@ -20,6 +20,7 @@ class AudioEngine {
     this.isPlaying = false;
     this.waveformPeaks = [];
     this.isLoadingTrack = false;
+    this.localBlobCache = new Map();
 
     this._unlocked = false;
     this._setupGlobalUnlock();
@@ -68,6 +69,15 @@ class AudioEngine {
     } else {
       this._unlocked = true;
     }
+    // Play a brief 1-sample silent buffer to force iOS CoreAudio hardware to un-mute
+    try {
+      if (this.ctx && this.ctx.state === 'running') {
+        const osc = this.ctx.createBufferSource();
+        osc.buffer = this.ctx.createBuffer(1, 1, 22050);
+        osc.connect(this.ctx.destination);
+        osc.start(0);
+      }
+    } catch (e) {}
   }
 
   getAudioMediaStream() {
@@ -174,8 +184,14 @@ class AudioEngine {
       let arrayBuffer = null;
 
       if (audioConfig.sourceType === 'local' && audioConfig.blobId) {
-        // Retrieve local blob from IndexedDB
-        const blob = await Storage.getBlob(audioConfig.blobId);
+        // Retrieve local blob from in-memory cache first, then IndexedDB
+        let blob = this.localBlobCache.get(audioConfig.blobId);
+        if (!blob) {
+          blob = await Storage.getBlob(audioConfig.blobId);
+          if (blob) {
+            this.localBlobCache.set(audioConfig.blobId, blob);
+          }
+        }
         if (blob) {
           arrayBuffer = await Utils.readFileAsArrayBuffer(blob);
         }
@@ -211,17 +227,30 @@ class AudioEngine {
         }
 
         decodedBuffer = await new Promise((resolve, reject) => {
+          let settled = false;
+          const onOk = (buf) => {
+            if (!settled) {
+              settled = true;
+              resolve(buf);
+            }
+          };
+          const onErr = (err) => {
+            if (!settled) {
+              settled = true;
+              reject(err);
+            }
+          };
           try {
             const res = this.ctx.decodeAudioData(
               arrayBuffer.slice(0),
-              (buffer) => resolve(buffer),
-              (err) => reject(err)
+              onOk,
+              onErr
             );
             if (res && typeof res.then === 'function') {
-              res.then(resolve).catch(reject);
+              res.then(onOk).catch(onErr);
             }
           } catch (e) {
-            reject(e);
+            onErr(e);
           }
         });
       }
@@ -346,15 +375,24 @@ class AudioEngine {
       Utils.showToast('Audio file too large (max 50MB)', 'error');
       return;
     }
-    if (file.type && !file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|ogg|aac|m4a|flac)$/i)) {
-      Utils.showToast('Please select a valid audio file (MP3, WAV, etc.)', 'error');
+    const isAudioMime = !file.type || file.type.startsWith('audio/') || file.type === 'video/mp4' || file.type === 'application/octet-stream';
+    const hasAudioExt = !!(file.name && file.name.match(/\.(mp3|wav|ogg|aac|m4a|flac|caf|mp4|aiff|alac)$/i));
+    if (!isAudioMime && !hasAudioExt) {
+      Utils.showToast('Please select a valid audio file (MP3, WAV, M4A, etc.)', 'error');
       return;
     }
     this.ensureContext();
 
     try {
       const blobId = Utils.generateId('audio_blob');
-      await Storage.saveBlob(blobId, file);
+      // Cache file object in memory immediately for instantaneous access & Private Browsing resilience
+      this.localBlobCache.set(blobId, file);
+
+      try {
+        await Storage.saveBlob(blobId, file);
+      } catch (storageErr) {
+        console.warn('[AudioEngine] Storage.saveBlob warning (likely Private Browsing):', storageErr);
+      }
 
       State.updateAudio({
         enabled: true,
@@ -371,15 +409,18 @@ class AudioEngine {
         loop: true
       });
 
-      await this.loadTrack(State.project.audio);
-      Utils.showToast(`Audio "${file.name}" imported successfully!`, 'success');
-      
-      // Auto-play preview on import
-      if (State.isPlaying) {
-        this.playAt(State.currentTime);
+      const loaded = await this.loadTrack(State.project.audio);
+      if (loaded) {
+        Utils.showToast(`Audio "${file.name}" imported successfully!`, 'success');
+        if (State.isPlaying) {
+          this.playAt(State.currentTime);
+        }
+      } else {
+        Utils.showToast(`Could not decode audio from "${file.name}". Ensure it is a valid MP3, WAV, or M4A file.`, 'error', 5000);
       }
     } catch (err) {
-      Utils.showToast(`Failed to import audio: ${err.message}`, 'error');
+      console.error('[AudioEngine] importLocalAudioFile failed:', err);
+      Utils.showToast(`Failed to import audio: ${err.message || err}`, 'error');
     }
   }
 

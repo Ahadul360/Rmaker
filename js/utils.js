@@ -233,7 +233,12 @@ export const Utils = {
   /**
    * Helper to read file as ArrayBuffer.
    */
-  readFileAsArrayBuffer(file) {
+  async readFileAsArrayBuffer(file) {
+    if (file && typeof file.arrayBuffer === 'function') {
+      try {
+        return await file.arrayBuffer();
+      } catch (e) {}
+    }
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
