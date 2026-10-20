@@ -428,14 +428,22 @@ var colr = (track) => box("colr", [
   u8((track.info.decoderConfig.colorSpace.fullRange ? 1 : 0) << 7)
   // Full range flag
 ]);
-var avcC = (track) => track.info.decoderConfig && box("avcC", [
-  // For AVC, description is an AVCDecoderConfigurationRecord, so nothing else to do here
-  ...new Uint8Array(track.info.decoderConfig.description)
-]);
-var hvcC = (track) => track.info.decoderConfig && box("hvcC", [
-  // For HEVC, description is a HEVCDecoderConfigurationRecord, so nothing else to do here
-  ...new Uint8Array(track.info.decoderConfig.description)
-]);
+var avcC = (track) => {
+  if (!track.info.decoderConfig || !track.info.decoderConfig.description) return null;
+  const desc = track.info.decoderConfig.description;
+  const bytes = ArrayBuffer.isView(desc)
+    ? new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength)
+    : new Uint8Array(desc);
+  return box("avcC", [...bytes]);
+};
+var hvcC = (track) => {
+  if (!track.info.decoderConfig || !track.info.decoderConfig.description) return null;
+  const desc = track.info.decoderConfig.description;
+  const bytes = ArrayBuffer.isView(desc)
+    ? new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength)
+    : new Uint8Array(desc);
+  return box("hvcC", [...bytes]);
+};
 var vpcC = (track) => {
   if (!track.info.decoderConfig) {
     return null;

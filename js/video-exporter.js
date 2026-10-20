@@ -121,6 +121,10 @@ export class VideoExporter {
               <div class="progress-bar-fill" id="export-progress-bar"></div>
             </div>
 
+            <div class="export-live-preview-wrap" style="display: flex; justify-content: center; margin: 12px 0 14px;">
+              <div id="export-canvas-mount" style="width: 120px; height: 213px; border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 16px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;"></div>
+            </div>
+
             <div class="export-stats-grid">
               <div class="stat-item">
                 <span class="stat-label">Progress:</span>
@@ -275,12 +279,15 @@ export class VideoExporter {
     if (!this.exportCanvas) {
       this.exportCanvas = document.createElement('canvas');
       this.exportCanvas.id = 'reelmaker-export-canvas';
-      // In iOS 18 WebKit / Mobile Safari, off-screen canvases outside the viewport (-9999px or 1px)
-      // have their GPU backing store suspended or culled.
-      // Keeping it within viewport bounds with non-zero dimensions and near-zero opacity ensures
-      // WebCodecs VideoFrame and captureStream encode crisp frames without failure.
-      this.exportCanvas.style.cssText = 'position:fixed; left:0; top:0; width:120px; height:120px; opacity:0.001; pointer-events:none; z-index:-1;';
-      document.body.appendChild(this.exportCanvas);
+      this.exportCanvas.style.cssText = 'width: 100%; height: 100%; object-fit: contain; display: block;';
+      const mount = this.exportModal ? this.exportModal.querySelector('#export-canvas-mount') : null;
+      if (mount) {
+        mount.innerHTML = '';
+        mount.appendChild(this.exportCanvas);
+      } else {
+        this.exportCanvas.style.cssText = 'position: fixed; left: 0; top: 0; width: 120px; height: 120px; opacity: 0.01; pointer-events: none; z-index: 1;';
+        document.body.appendChild(this.exportCanvas);
+      }
     }
     this.exportCanvas.width = w;
     this.exportCanvas.height = h;
@@ -293,6 +300,10 @@ export class VideoExporter {
       try {
         this.exportCanvas.parentNode.removeChild(this.exportCanvas);
       } catch (e) {}
+    }
+    const mount = this.exportModal ? this.exportModal.querySelector('#export-canvas-mount') : null;
+    if (mount) {
+      mount.innerHTML = '';
     }
     this.exportCanvas = null;
     this.exportRenderer = null;
@@ -353,25 +364,23 @@ export class VideoExporter {
       typeof window.VideoEncoder !== 'undefined' &&
       typeof window.VideoFrame !== 'undefined';
 
-    // If user wants MP4 and browser has WebCodecs, check for H.264/AVC support.
-    // WebCodecs encodes frames directly from canvas without requiring MediaStream/MediaRecorder,
-    // avoiding the known WebKit bug on iOS Safari where mixed canvas+audio MediaStreams fail.
-    if (format === 'mp4' && hasWebCodecs) {
-      const supportedAvcCodec = await this.checkAvcSupport(options);
-      if (supportedAvcCodec) {
-        return this.exportWithWebCodecs(options, supportedAvcCodec);
+    // If user wants MP4 (the universal social media format):
+    // Use WebCodecs (MP4 H.264) hardware engine
+    if (format === 'mp4') {
+      if (hasWebCodecs) {
+        const supportedConfig = await this.checkAvcSupport(options);
+        return this.exportWithWebCodecs(options, supportedConfig);
+      } else {
+        Utils.showToast('WebCodecs (MP4 H.264) is not available in this browser. Please use Chrome or iOS Safari on iOS 16.4+.', 'error', 6000);
+        return;
       }
     }
 
-    // Otherwise use MediaRecorder with duration patching
+    // Otherwise use MediaRecorder with duration patching (for WebM format)
     return this.exportWithMediaRecorder(options);
   }
 
   async checkAvcSupport(options) {
-    if (typeof VideoEncoder === 'undefined' || typeof VideoEncoder.isConfigSupported !== 'function') {
-      return null;
-    }
-
     const { resolution = '1080p', fps = 30 } = options;
     const project = State.project;
     const baseWidth = Presets.aspectRatios[project.aspectRatio]?.width || 1080;
@@ -385,51 +394,66 @@ export class VideoExporter {
 
     const bitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 4500000 : 2500000);
 
-    // Prioritize Level 4.2 / 5.1 / 4.0. Level 3.1 has a maximum macroblock limit of 1,620 and fails for 720p/1080p on iOS VideoToolbox.
     const avcProfiles = [
-      'avc1.4d002a', // Main Profile Level 4.2 (1080p up to 60fps - standard across iOS & Android)
-      'avc1.640028', // High Profile Level 4.0 (1080p @ 30fps)
+      'avc1.4d002a', // Main Profile Level 4.2
+      'avc1.42002a', // Baseline Profile Level 4.2
+      'avc1.640028', // High Profile Level 4.0
       'avc1.64002a', // High Profile Level 4.2
-      'avc1.4d0033', // Main Profile Level 5.1 (high-end iOS devices e.g. iPhone 16 Pro Max)
+      'avc1.4d0033', // Main Profile Level 5.1
       'avc1.640033', // High Profile Level 5.1
       'avc1.420028', // Baseline Profile Level 4.0
-      'avc1.42002a', // Baseline Profile Level 4.2
-      'avc1.4d001f', // Main Profile Level 3.1
       'avc1.42001f', // Baseline Profile Level 3.1
-      'avc1.42E01E'  // Constrained Baseline
+      'avc1.42001e', // Baseline Profile Level 3.0
+      'avc1.42E01E', // Constrained Baseline Level 3.0
+      'avc1.4D401E', // Main Profile Level 3.0
+      'avc1.4d001f'  // Main Profile Level 3.1
     ];
 
-    for (const codec of avcProfiles) {
-      try {
-        const res = await VideoEncoder.isConfigSupported({
-          codec,
-          width: exportW,
-          height: exportH,
-          bitrate,
-          framerate: fps
-        });
-        if (res && res.supported) {
-          return codec;
-        }
-      } catch (e) {}
+    if (typeof VideoEncoder !== 'undefined' && typeof VideoEncoder.isConfigSupported === 'function') {
+      for (const codec of avcProfiles) {
+        try {
+          const cfg = {
+            codec,
+            width: exportW,
+            height: exportH,
+            bitrate,
+            framerate: fps
+          };
+          const res = await VideoEncoder.isConfigSupported(cfg);
+          if (res && res.supported) {
+            return res.config || cfg;
+          }
+        } catch (e) {}
+      }
+
+      // Secondary check without bitrate (some WebKit/Safari versions require omitting bitrate in query)
+      for (const codec of avcProfiles) {
+        try {
+          const cfg = {
+            codec,
+            width: exportW,
+            height: exportH
+          };
+          const res = await VideoEncoder.isConfigSupported(cfg);
+          if (res && res.supported) {
+            return {
+              ...(res.config || cfg),
+              bitrate,
+              framerate: fps
+            };
+          }
+        } catch (e) {}
+      }
     }
 
-    // Secondary check without bitrate (some WebKit/Safari versions require omitting bitrate in query)
-    for (const codec of avcProfiles) {
-      try {
-        const res = await VideoEncoder.isConfigSupported({
-          codec,
-          width: exportW,
-          height: exportH
-        });
-        if (res && res.supported) {
-          return codec;
-        }
-      } catch (e) {}
-    }
-
-    // Fallback default for WebCodecs
-    return 'avc1.4d002a';
+    // Fallback default config object
+    return {
+      codec: 'avc1.4d002a',
+      width: exportW,
+      height: exportH,
+      bitrate,
+      framerate: fps
+    };
   }
 
   /**
@@ -449,7 +473,14 @@ export class VideoExporter {
     // If stream is already length-prefixed AVCC (not Annex B start codes)
     if (!isAnnexB) {
       if (meta?.decoderConfig?.description) {
-        this.cachedDescription = meta.decoderConfig.description;
+        let desc = meta.decoderConfig.description;
+        if (ArrayBuffer.isView(desc)) {
+          desc = new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
+        } else if (desc instanceof ArrayBuffer) {
+          desc = new Uint8Array(desc);
+        }
+        this.cachedDescription = desc;
+        meta.decoderConfig.description = desc;
       } else if (this.cachedDescription && (!meta || !meta.decoderConfig || !meta.decoderConfig.description)) {
         meta = meta || {};
         meta.decoderConfig = meta.decoderConfig || { codec: avcCodec };
@@ -578,7 +609,7 @@ export class VideoExporter {
    * Generates true H.264/AAC MP4 with FastStart (moov atom at front) and exact duration.
    * Perfect for TikTok, Facebook Reels, YouTube Shorts & Instagram.
    */
-  async exportWithWebCodecs(options, avcCodec = 'avc1.4d002a') {
+  async exportWithWebCodecs(options, supportedConfig = null) {
     const { resolution = '1080p', fps = 30, includeAudio = true } = options;
     const project = State.project;
     const duration = project.duration;
@@ -591,6 +622,9 @@ export class VideoExporter {
     exportW = Math.floor(exportW / 2) * 2;
     exportH = Math.floor(exportH / 2) * 2;
     const videoBitrate = resolution === '1080p' ? 8000000 : (resolution === '720p' ? 5000000 : 3000000);
+    let avcCodec = (typeof supportedConfig === 'object' && supportedConfig?.codec)
+      ? supportedConfig.codec
+      : (typeof supportedConfig === 'string' ? supportedConfig : 'avc1.4d002a');
 
     // Reset cached SPS/PPS/Description for this export session
     this.cachedSps = null;
@@ -769,45 +803,61 @@ export class VideoExporter {
         }
       });
 
-      // Configure VideoEncoder with fallback candidate profiles
-      const candidateCodecs = [
-        avcCodec,
-        'avc1.4d002a',
-        'avc1.640028',
-        'avc1.64002a',
-        'avc1.4d0033',
-        'avc1.420028',
-        'avc1.42001f'
-      ];
+      // Configure VideoEncoder with verified or fallback candidate profiles
       let isConfigured = false;
       let lastConfigErr = null;
 
-      for (const candidate of candidateCodecs) {
-        if (!candidate) continue;
+      if (supportedConfig && typeof supportedConfig === 'object') {
         try {
-          videoEncoder.configure({
-            codec: candidate,
-            width: exportW,
-            height: exportH,
-            bitrate: videoBitrate,
-            framerate: fps
-          });
+          videoEncoder.configure(supportedConfig);
           isConfigured = true;
-          avcCodec = candidate;
-          break;
-        } catch (err) {
+          avcCodec = supportedConfig.codec || avcCodec;
+        } catch (e) {
+          console.warn('[VideoEncoder initial configure with supportedConfig failed]:', e);
+        }
+      }
+
+      if (!isConfigured) {
+        const candidateCodecs = [
+          avcCodec,
+          'avc1.4d002a',
+          'avc1.42002a',
+          'avc1.640028',
+          'avc1.64002a',
+          'avc1.4d0033',
+          'avc1.420028',
+          'avc1.42001f',
+          'avc1.42001e',
+          'avc1.42E01E'
+        ];
+
+        for (const candidate of candidateCodecs) {
+          if (!candidate) continue;
           try {
             videoEncoder.configure({
               codec: candidate,
               width: exportW,
-              height: exportH
+              height: exportH,
+              bitrate: videoBitrate,
+              framerate: fps
             });
             isConfigured = true;
             avcCodec = candidate;
             break;
-          } catch (err2) {
-            lastConfigErr = err2;
-            console.warn(`[VideoEncoder configure failed for ${candidate}]`, err2);
+          } catch (err) {
+            try {
+              videoEncoder.configure({
+                codec: candidate,
+                width: exportW,
+                height: exportH
+              });
+              isConfigured = true;
+              avcCodec = candidate;
+              break;
+            } catch (err2) {
+              lastConfigErr = err2;
+              console.warn(`[VideoEncoder configure failed for ${candidate}]`, err2);
+            }
           }
         }
       }
@@ -839,7 +889,8 @@ export class VideoExporter {
         }
         lastFrameTimestampUs = timestampUs;
 
-        let videoFrame;
+        let videoFrame = null;
+        let bitmap = null;
         try {
           videoFrame = new VideoFrame(this.exportCanvas, {
             timestamp: timestampUs,
@@ -849,15 +900,17 @@ export class VideoExporter {
           try {
             videoFrame = new VideoFrame(this.exportCanvas, { timestamp: timestampUs });
           } catch (e2) {
-            const bitmap = await createImageBitmap(this.exportCanvas);
+            bitmap = await createImageBitmap(this.exportCanvas);
             videoFrame = new VideoFrame(bitmap, { timestamp: timestampUs });
-            bitmap.close();
           }
         }
 
         const isKey = frameIndex % (fps * 2) === 0;
         videoEncoder.encode(videoFrame, { keyFrame: isKey });
         videoFrame.close();
+        if (bitmap) {
+          bitmap.close();
+        }
 
         // Control memory queue backpressure with while loop to avoid hardware queue saturation on iOS
         while (videoEncoder.encodeQueueSize > 2) {
@@ -895,16 +948,7 @@ export class VideoExporter {
       Utils.showToast('Reel video exported in MP4 format (Social Media Ready)!', 'success');
     } catch (err) {
       console.error('WebCodecs export failed:', err);
-      const canCapture = typeof HTMLCanvasElement !== 'undefined' &&
-        typeof HTMLCanvasElement.prototype.captureStream === 'function';
       this.cleanupExportCanvas();
-
-      // Only fallback to MediaRecorder if canvas.captureStream actually exists on this device
-      if (this.isExporting && !this.abortController.signal.aborted && canCapture) {
-        console.warn('Falling back to MediaRecorder...');
-        Utils.showToast('Switching to standard recorder...', 'info', 2500);
-        return this.exportWithMediaRecorder(options);
-      }
       this.cancelExport(false);
       Utils.showToast(`Export failed: ${err.message || err}`, 'error', 7000);
     }
