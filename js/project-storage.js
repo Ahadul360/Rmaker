@@ -402,4 +402,7 @@ class ProjectStorage {
   }
 }
 
-export const Storage = new ProjectStorage();
+export const Storage = (typeof window !== 'undefined' && window.StorageInstance) ? window.StorageInstance : new ProjectStorage();
+if (typeof window !== 'undefined') {
+  window.StorageInstance = Storage;
+}

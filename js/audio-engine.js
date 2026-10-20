@@ -4,9 +4,9 @@
  * waveform peak generation, and MediaStreamDestination piping for video export.
  */
 
-import { Utils } from './utils.js?v=2.3.5';
-import { State } from './state.js?v=2.3.5';
-import { Storage } from './project-storage.js?v=2.3.5';
+import { Utils } from './utils.js';
+import { State } from './state.js';
+import { Storage } from './project-storage.js';
 
 class AudioEngine {
   constructor() {
@@ -32,6 +32,9 @@ class AudioEngine {
     };
     window.addEventListener('click', unlock, { passive: true });
     window.addEventListener('touchstart', unlock, { passive: true });
+    window.addEventListener('touchend', unlock, { passive: true });
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('pointerup', unlock, { passive: true });
     window.addEventListener('keydown', unlock, { passive: true });
   }
 
@@ -51,7 +54,7 @@ class AudioEngine {
       this.gainNode.connect(this.streamDestination);
     }
 
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
       this.ctx.resume().catch(e => console.warn('AudioContext resume error:', e));
     }
     return this.ctx;
@@ -59,7 +62,8 @@ class AudioEngine {
 
   async unlockAudioContext() {
     this.ensureContext();
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
       try {
         await this.ctx.resume();
         this._unlocked = true;
@@ -71,12 +75,10 @@ class AudioEngine {
     }
     // Play a brief 1-sample silent buffer to force iOS CoreAudio hardware to un-mute
     try {
-      if (this.ctx && this.ctx.state === 'running') {
-        const osc = this.ctx.createBufferSource();
-        osc.buffer = this.ctx.createBuffer(1, 1, 22050);
-        osc.connect(this.ctx.destination);
-        osc.start(0);
-      }
+      const osc = this.ctx.createBufferSource();
+      osc.buffer = this.ctx.createBuffer(1, 1, 22050);
+      osc.connect(this.ctx.destination);
+      osc.start(0);
     } catch (e) {}
   }
 
@@ -296,7 +298,7 @@ class AudioEngine {
     }
 
     this.ensureContext();
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
       try {
         await this.ctx.resume();
       } catch (e) {}
@@ -310,6 +312,22 @@ class AudioEngine {
 
     if (!this.currentBuffer) {
       return;
+    }
+
+    // If currentBuffer is a plain mock object, convert to real AudioBuffer
+    if (this.ctx && typeof this.ctx.createBuffer === 'function' && typeof this.currentBuffer.copyFromChannel !== 'function') {
+      try {
+        const realBuf = this.ctx.createBuffer(
+          this.currentBuffer.numberOfChannels || 2,
+          this.currentBuffer.length || 0,
+          this.currentBuffer.sampleRate || 44100
+        );
+        for (let c = 0; c < (this.currentBuffer.numberOfChannels || 2); c++) {
+          const chData = this.currentBuffer.getChannelData(c);
+          if (chData) realBuf.getChannelData(c).set(chData);
+        }
+        this.currentBuffer = realBuf;
+      } catch (e) {}
     }
 
     this.stopSourceOnly();
@@ -554,4 +572,7 @@ class AudioEngine {
   }
 }
 
-export const AudioSys = new AudioEngine();
+export const AudioSys = (typeof window !== 'undefined' && window.AudioSys) ? window.AudioSys : new AudioEngine();
+if (typeof window !== 'undefined') {
+  window.AudioSys = AudioSys;
+}

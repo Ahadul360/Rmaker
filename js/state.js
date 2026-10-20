@@ -363,4 +363,7 @@ class StateManager {
   }
 }
 
-export const State = new StateManager();
+export const State = (typeof window !== 'undefined' && window.State) ? window.State : new StateManager();
+if (typeof window !== 'undefined') {
+  window.State = State;
+}

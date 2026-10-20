@@ -114,8 +114,28 @@ export class Timeline {
 
   bindEvents() {
     // Play/Pause
+    const unlockAudioDirect = () => {
+      try {
+        AudioSys.unlockAudioContext();
+        if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+          AudioSys.ctx.resume().catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    this.playBtn.addEventListener('pointerdown', unlockAudioDirect, { passive: true });
+
     this.playBtn.addEventListener('click', async () => {
-      await AudioSys.unlockAudioContext();
+      try {
+        unlockAudioDirect();
+        await AudioSys.unlockAudioContext();
+        if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+          await AudioSys.ctx.resume();
+        }
+        if (!AudioSys.currentBuffer && State.project?.audio?.enabled) {
+          await AudioSys.loadTrack(State.project.audio);
+        }
+      } catch (e) {}
       State.togglePlay();
     });
 

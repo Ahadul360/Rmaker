@@ -8,14 +8,14 @@
  *    - Automatically injects EBML Duration metadata (0x4489) for seeking & timeline display.
  */
 
-import { Utils } from './utils.js?v=2.3.5';
-import { State } from './state.js?v=2.3.5';
-import { CanvasRenderer } from './canvas-renderer.js?v=2.3.5';
-import { AudioSys } from './audio-engine.js?v=2.3.5';
-import { Presets } from './presets.js?v=2.3.5';
-import * as Mp4Muxer from './mp4-muxer.js?v=2.3.5';
-import { fixWebmDuration } from './fix-webm-duration.js?v=2.3.5';
-import aacInit from './aac-encoder.js?v=2.3.5';
+import { Utils } from './utils.js';
+import { State } from './state.js';
+import { CanvasRenderer } from './canvas-renderer.js';
+import { AudioSys } from './audio-engine.js';
+import { Presets } from './presets.js';
+import * as Mp4Muxer from './mp4-muxer.js';
+import { fixWebmDuration } from './fix-webm-duration.js';
+import aacInit from './aac-encoder.js';
 
 export class VideoExporter {
   constructor() {
@@ -32,6 +32,11 @@ export class VideoExporter {
     this.cachedSps = null;
     this.cachedPps = null;
     this.cachedDescription = null;
+    this.lastRenderedAudioBuffer = null;
+    this.lastExportAudioTrackConfig = null;
+    this.lastExportAudioChunksCount = 0;
+    this.previewAudioSource = null;
+    this.isPreviewMuted = false;
 
     this.initExportModal();
   }
@@ -162,8 +167,11 @@ export class VideoExporter {
               </div>
             </div>
 
-            <div class="export-preview-wrapper">
+            <div class="export-preview-wrapper" style="position: relative;">
               <video id="export-video-preview" controls playsinline></video>
+              <button type="button" id="btn-preview-sound-toggle" class="btn btn-sm" style="position: absolute; top: 12px; right: 12px; z-index: 10; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #fff; background: rgba(46, 213, 115, 0.9); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; gap: 5px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(8px);">
+                <span>🔊</span> <span>Sound ON</span>
+              </button>
             </div>
 
             <div class="export-audio-helper" style="margin-top: 10px; margin-bottom: 5px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; text-align: left;">
@@ -304,6 +312,40 @@ export class VideoExporter {
     }
   }
 
+  startPreviewAudio(fromTime = 0) {
+    if (this.isPreviewMuted || !this.lastRenderedAudioBuffer || !this.lastExportAudioTrackConfig) {
+      return;
+    }
+    this.stopPreviewAudio();
+    try {
+      AudioSys.ensureContext();
+      if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+        AudioSys.ctx.resume().catch(() => {});
+      }
+      const dur = this.lastRenderedAudioBuffer.duration;
+      const offset = Math.max(0, Math.min(fromTime, Math.max(0, dur - 0.05)));
+      this.previewAudioSource = AudioSys.ctx.createBufferSource();
+      this.previewAudioSource.buffer = this.lastRenderedAudioBuffer;
+      this.previewAudioSource.connect(AudioSys.ctx.destination);
+      this.previewAudioSource.start(0, offset);
+      this.previewAudioSource.onended = () => {
+        this.previewAudioSource = null;
+      };
+    } catch (err) {
+      console.warn('[VideoExporter] startPreviewAudio error:', err);
+    }
+  }
+
+  stopPreviewAudio() {
+    if (this.previewAudioSource) {
+      try {
+        this.previewAudioSource.stop();
+        this.previewAudioSource.disconnect();
+      } catch (e) {}
+      this.previewAudioSource = null;
+    }
+  }
+
   openSettings() {
     if (this.isExporting) return;
     const modal = this.exportModal;
@@ -313,6 +355,11 @@ export class VideoExporter {
   }
 
   closeModal() {
+    this.stopPreviewAudio();
+    const videoEl = this.exportModal?.querySelector('#export-video-preview');
+    if (videoEl) {
+      try { videoEl.pause(); } catch (e) {}
+    }
     if (this.isExporting) {
       if (!confirm('Video is currently exporting. Do you want to cancel?')) return;
       this.cancelExport();
@@ -321,12 +368,22 @@ export class VideoExporter {
   }
 
   showConfigView() {
+    this.stopPreviewAudio();
+    const videoEl = this.exportModal?.querySelector('#export-video-preview');
+    if (videoEl) {
+      try { videoEl.pause(); } catch (e) {}
+    }
     this.exportModal.querySelector('#export-config-view').style.display = 'block';
     this.exportModal.querySelector('#export-progress-view').style.display = 'none';
     this.exportModal.querySelector('#export-complete-view').style.display = 'none';
   }
 
   showProgressView() {
+    this.stopPreviewAudio();
+    const videoEl = this.exportModal?.querySelector('#export-video-preview');
+    if (videoEl) {
+      try { videoEl.pause(); } catch (e) {}
+    }
     this.exportModal.querySelector('#export-config-view').style.display = 'none';
     this.exportModal.querySelector('#export-progress-view').style.display = 'block';
     this.exportModal.querySelector('#export-complete-view').style.display = 'none';
@@ -410,9 +467,122 @@ export class VideoExporter {
 
     const videoEl = completeView.querySelector('#export-video-preview');
     videoEl.src = blobUrl;
-    videoEl.muted = false;
-    videoEl.volume = 1.0;
+    videoEl.muted = true; // Use Web Audio for guaranteed sound across all platforms & iOS silent mode
+    videoEl.currentTime = 0;
     videoEl.load();
+
+    this.stopPreviewAudio();
+    this.isPreviewMuted = false;
+
+    const soundToggleBtn = completeView.querySelector('#btn-preview-sound-toggle');
+    const updateSoundToggleUI = () => {
+      if (!soundToggleBtn) return;
+      if (!this.lastExportAudioTrackConfig || !this.lastRenderedAudioBuffer) {
+        soundToggleBtn.innerHTML = `<span>🔇</span> <span>No Audio</span>`;
+        soundToggleBtn.style.opacity = '0.6';
+        soundToggleBtn.style.pointerEvents = 'none';
+      } else if (this.isPreviewMuted) {
+        soundToggleBtn.innerHTML = `<span>🔇</span> <span>Sound Muted</span>`;
+        soundToggleBtn.style.opacity = '1';
+        soundToggleBtn.style.pointerEvents = 'auto';
+        soundToggleBtn.style.background = 'rgba(255, 71, 87, 0.85)';
+      } else {
+        soundToggleBtn.innerHTML = `<span>🔊</span> <span>Sound ON</span>`;
+        soundToggleBtn.style.opacity = '1';
+        soundToggleBtn.style.pointerEvents = 'auto';
+        soundToggleBtn.style.background = 'rgba(46, 213, 115, 0.9)';
+      }
+    };
+    updateSoundToggleUI();
+
+    if (soundToggleBtn) {
+      soundToggleBtn.addEventListener('pointerdown', () => {
+        try {
+          AudioSys.unlockAudioContext();
+          if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+            AudioSys.ctx.resume().catch(() => {});
+          }
+        } catch (e) {}
+      }, { passive: true });
+
+      soundToggleBtn.onclick = async (e) => {
+        e.stopPropagation();
+        this.isPreviewMuted = !this.isPreviewMuted;
+        updateSoundToggleUI();
+        if (this.isPreviewMuted) {
+          this.stopPreviewAudio();
+        } else {
+          try {
+            await AudioSys.unlockAudioContext();
+            if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+              await AudioSys.ctx.resume();
+            }
+          } catch (err) {}
+          if (!videoEl.paused) {
+            this.startPreviewAudio(videoEl.currentTime);
+          } else {
+            videoEl.play().catch(() => {});
+          }
+        }
+      };
+    }
+
+    const unlockOnVideoInteraction = () => {
+      try {
+        AudioSys.unlockAudioContext();
+        if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+          AudioSys.ctx.resume().catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    videoEl.addEventListener('pointerdown', unlockOnVideoInteraction, { passive: true });
+    videoEl.addEventListener('touchstart', unlockOnVideoInteraction, { passive: true });
+
+    videoEl.onplay = async () => {
+      try {
+        unlockOnVideoInteraction();
+        await AudioSys.unlockAudioContext();
+        if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+          await AudioSys.ctx.resume();
+        }
+      } catch (err) {}
+      this.startPreviewAudio(videoEl.currentTime);
+    };
+
+    videoEl.onpause = () => {
+      this.stopPreviewAudio();
+    };
+
+    videoEl.onseeking = () => {
+      if (!videoEl.paused) {
+        this.startPreviewAudio(videoEl.currentTime);
+      }
+    };
+
+    videoEl.onseeked = () => {
+      if (!videoEl.paused) {
+        this.startPreviewAudio(videoEl.currentTime);
+      }
+    };
+
+    videoEl.onvolumechange = () => {
+      if (!videoEl.muted) {
+        // Prevent double audio on desktop: keep videoEl muted and let Web Audio provide clean sound
+        videoEl.muted = true;
+        if (this.isPreviewMuted) {
+          this.isPreviewMuted = false;
+          updateSoundToggleUI();
+          if (!videoEl.paused) {
+            this.startPreviewAudio(videoEl.currentTime);
+          }
+        }
+      }
+    };
+
+    videoEl.onended = () => {
+      this.stopPreviewAudio();
+    };
 
     const audioTestBtn = completeView.querySelector('#btn-test-exported-audio');
     if (audioTestBtn) {
@@ -1464,6 +1634,16 @@ export class VideoExporter {
 
         this.cleanupExportCanvas();
 
+        if (State.project?.audio?.enabled && AudioSys.currentBuffer) {
+          this.lastRenderedAudioBuffer = AudioSys.currentBuffer;
+          this.lastExportAudioTrackConfig = {
+            codec: 'aac',
+            numberOfChannels: 2,
+            sampleRate: AudioSys.ctx?.sampleRate || 44100
+          };
+          this.lastExportAudioChunksCount = 1;
+        }
+
         this.resultUrl = URL.createObjectURL(this.resultBlob);
         this.isExporting = false;
         this.showCompleteView(this.resultUrl);
@@ -1484,6 +1664,7 @@ export class VideoExporter {
 
   cancelExport(showToast = true) {
     this.isExporting = false;
+    this.stopPreviewAudio();
     if (this.abortController) {
       this.abortController.abort();
     }

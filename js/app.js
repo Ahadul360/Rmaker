@@ -4,16 +4,16 @@
  * tool panels, keyboard shortcuts, templates, and PWA offline readiness.
  */
 
-import { Utils } from './utils.js?v=2.3.5';
-import { State } from './state.js?v=2.3.5';
-import { Storage } from './project-storage.js?v=2.3.5';
-import { Presets } from './presets.js?v=2.3.5';
-import { CanvasRenderer } from './canvas-renderer.js?v=2.3.5';
-import { AudioSys } from './audio-engine.js?v=2.3.5';
-import { Timeline } from './timeline.js?v=2.3.5';
-import { Exporter } from './video-exporter.js?v=2.3.5';
-import { TextEditor } from './text-editor.js?v=2.3.5';
-import { BackgroundEditor } from './background-editor.js?v=2.3.5';
+import { Utils } from './utils.js';
+import { State } from './state.js';
+import { Storage } from './project-storage.js';
+import { Presets } from './presets.js';
+import { CanvasRenderer } from './canvas-renderer.js';
+import { AudioSys } from './audio-engine.js';
+import { Timeline } from './timeline.js';
+import { Exporter } from './video-exporter.js';
+import { TextEditor } from './text-editor.js';
+import { BackgroundEditor } from './background-editor.js';
 
 class ReelApp {
   constructor() {
@@ -114,6 +114,12 @@ class ReelApp {
     // Listen to playback state changes globally
     State.on('playbackChange', async (isPlaying) => {
       if (isPlaying) {
+        try {
+          await AudioSys.unlockAudioContext();
+          if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+            await AudioSys.ctx.resume();
+          }
+        } catch (e) {}
         await AudioSys.playAt(State.currentTime);
       } else {
         AudioSys.stop();
@@ -940,8 +946,23 @@ class ReelApp {
       State.updateAudio({ loop: e.target.checked });
     });
 
+    const unlockPreviewDirect = () => {
+      try {
+        AudioSys.unlockAudioContext();
+        if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+          AudioSys.ctx.resume().catch(() => {});
+        }
+      } catch (e) {}
+    };
+
+    btnPreview.addEventListener('pointerdown', unlockPreviewDirect, { passive: true });
+
     btnPreview.addEventListener('click', async () => {
+      unlockPreviewDirect();
       await AudioSys.unlockAudioContext();
+      if (AudioSys.ctx && (AudioSys.ctx.state === 'suspended' || AudioSys.ctx.state === 'interrupted')) {
+        await AudioSys.ctx.resume();
+      }
       if (AudioSys.isPlaying) {
         AudioSys.stop();
         btnPreview.innerHTML = `<span>▶ Preview Music</span>`;
