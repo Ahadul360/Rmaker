@@ -8,14 +8,14 @@
  *    - Automatically injects EBML Duration metadata (0x4489) for seeking & timeline display.
  */
 
-import { Utils } from './utils.js';
-import { State } from './state.js';
-import { CanvasRenderer } from './canvas-renderer.js';
-import { AudioSys } from './audio-engine.js';
-import { Presets } from './presets.js';
-import * as Mp4Muxer from './mp4-muxer.js';
-import { fixWebmDuration } from './fix-webm-duration.js';
-import aacInit from './aac-encoder.js';
+import { Utils } from './utils.js?v=2.3.5';
+import { State } from './state.js?v=2.3.5';
+import { CanvasRenderer } from './canvas-renderer.js?v=2.3.5';
+import { AudioSys } from './audio-engine.js?v=2.3.5';
+import { Presets } from './presets.js?v=2.3.5';
+import * as Mp4Muxer from './mp4-muxer.js?v=2.3.5';
+import { fixWebmDuration } from './fix-webm-duration.js?v=2.3.5';
+import aacInit from './aac-encoder.js?v=2.3.5';
 
 export class VideoExporter {
   constructor() {
@@ -156,10 +156,29 @@ export class VideoExporter {
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2ED573" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               <h4 id="export-complete-title">Reel Video Ready (.mp4)!</h4>
               <p id="export-complete-subtitle" style="font-size: 12px; color: var(--text-muted); margin: 0;">Full duration metadata included & ready to upload.</p>
+              <div id="export-audio-badge" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(46, 213, 115, 0.15); color: #2ed573; margin-top: 6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <span id="export-audio-badge-text">Stereo AAC Audio Track Included</span>
+              </div>
             </div>
 
             <div class="export-preview-wrapper">
               <video id="export-video-preview" controls playsinline></video>
+            </div>
+
+            <div class="export-audio-helper" style="margin-top: 10px; margin-bottom: 5px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; text-align: left;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px;">
+                <span style="font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 5px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ed573" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                  Sound Check
+                </span>
+                <button type="button" id="btn-test-exported-audio" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;">
+                  🔊 Play Sound Check
+                </button>
+              </div>
+              <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                <strong style="color: #ff9f43;">iPhone Notice:</strong> If your iPhone is on <em>Silent Mode</em> (Silent switch or Action Button), preview videos play muted by default. Unmute in Photos or turn off Silent Mode to hear audio.
+              </p>
             </div>
 
             <div class="modal-footer flex-column" style="gap: 10px;">
@@ -249,6 +268,40 @@ export class VideoExporter {
     modal.querySelector('#btn-export-again').addEventListener('click', () => {
       this.showConfigView();
     });
+
+    const audioTestBtn = modal.querySelector('#btn-test-exported-audio');
+    if (audioTestBtn) {
+      let testSource = null;
+      audioTestBtn.addEventListener('click', async () => {
+        if (testSource) {
+          try { testSource.stop(); } catch (e) {}
+          testSource = null;
+          audioTestBtn.textContent = '🔊 Play Sound Check';
+          return;
+        }
+        if (!this.lastRenderedAudioBuffer) {
+          Utils.showToast('No audio buffer available to test', 'info');
+          return;
+        }
+        try {
+          await AudioSys.unlockAudioContext();
+          if (AudioSys.ctx && AudioSys.ctx.state === 'suspended') {
+            await AudioSys.ctx.resume();
+          }
+          testSource = AudioSys.ctx.createBufferSource();
+          testSource.buffer = this.lastRenderedAudioBuffer;
+          testSource.connect(AudioSys.ctx.destination);
+          testSource.onended = () => {
+            testSource = null;
+            audioTestBtn.textContent = '🔊 Play Sound Check';
+          };
+          testSource.start(0);
+          audioTestBtn.textContent = '⏹ Stop Sound Check';
+        } catch (err) {
+          console.warn('[VideoExporter] Audio check error:', err);
+        }
+      });
+    }
   }
 
   openSettings() {
@@ -357,7 +410,31 @@ export class VideoExporter {
 
     const videoEl = completeView.querySelector('#export-video-preview');
     videoEl.src = blobUrl;
+    videoEl.muted = false;
+    videoEl.volume = 1.0;
     videoEl.load();
+
+    const audioTestBtn = completeView.querySelector('#btn-test-exported-audio');
+    if (audioTestBtn) {
+      audioTestBtn.textContent = '🔊 Play Sound Check';
+      audioTestBtn.style.display = this.lastRenderedAudioBuffer ? 'inline-flex' : 'none';
+    }
+
+    const audioBadge = completeView.querySelector('#export-audio-badge');
+    const audioBadgeText = completeView.querySelector('#export-audio-badge-text');
+    if (audioBadge && audioBadgeText) {
+      if (this.lastExportAudioTrackConfig && this.lastExportAudioChunksCount > 0) {
+        audioBadge.style.display = 'inline-flex';
+        audioBadge.style.background = 'rgba(46, 213, 115, 0.15)';
+        audioBadge.style.color = '#2ed573';
+        audioBadgeText.textContent = `✓ Audio Track Verified: Stereo AAC (${this.lastExportAudioTrackConfig.sampleRate || 44100}Hz, ${this.lastExportAudioChunksCount} chunks)`;
+      } else {
+        audioBadge.style.display = 'inline-flex';
+        audioBadge.style.background = 'rgba(255, 71, 87, 0.15)';
+        audioBadge.style.color = '#ff4757';
+        audioBadgeText.textContent = 'Video Only (No audio track)';
+      }
+    }
   }
 
   async startExport(options) {
@@ -650,7 +727,6 @@ export class VideoExporter {
       }
 
       const audioChunks = [];
-      let nextAudioTimestampUs = 0;
       const durUs = Math.round((frameSize / sampleRate) * 1000000);
 
       for (let offset = 0; offset < totalSamples; offset += frameSize) {
@@ -665,16 +741,18 @@ export class VideoExporter {
         while (true) {
           const pktSize = wasm._receive_packet(ctx);
           if (pktSize <= 0) break;
+          const pts = wasm._get_encoded_pts(ctx);
+          if (pts < 0n) continue; // CRITICAL: Filter out FFmpeg AAC priming/delay packet (-1024)
           const dataPtr = wasm._get_encoded_data(ctx);
           const pktData = new Uint8Array(wasm.HEAPU8.buffer, dataPtr, pktSize).slice(0);
+          const tsUs = Math.round((Number(pts) / sampleRate) * 1000000);
           audioChunks.push({
             data: pktData,
             type: 'key',
-            timestamp: nextAudioTimestampUs,
+            timestamp: tsUs,
             duration: durUs,
             meta: { decoderConfig: { description: asc } }
           });
-          nextAudioTimestampUs += durUs;
         }
       }
 
@@ -682,16 +760,18 @@ export class VideoExporter {
       while (true) {
         const pktSize = wasm._receive_packet(ctx);
         if (pktSize <= 0) break;
+        const pts = wasm._get_encoded_pts(ctx);
+        if (pts < 0n) continue; // CRITICAL: Filter out any negative PTS packet
         const dataPtr = wasm._get_encoded_data(ctx);
         const pktData = new Uint8Array(wasm.HEAPU8.buffer, dataPtr, pktSize).slice(0);
+        const tsUs = Math.round((Number(pts) / sampleRate) * 1000000);
         audioChunks.push({
           data: pktData,
           type: 'key',
-          timestamp: nextAudioTimestampUs,
+          timestamp: tsUs,
           duration: durUs,
           meta: { decoderConfig: { description: asc } }
         });
-        nextAudioTimestampUs += durUs;
       }
 
       wasm._close_encoder(ctx);
@@ -758,7 +838,13 @@ export class VideoExporter {
           }
 
           let targetSampleRate = 44100;
-          const hasAudioCodecs = typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
+          const isIOSDevice = typeof navigator !== 'undefined' && (
+            /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+          );
+          // On iOS, native AudioEncoder has documented WebKit bugs (silent output, hanging flush, unsupported mp4a).
+          // We intentionally bypass AudioEncoder on iOS and directly use our standalone WASM AAC engine!
+          const hasAudioCodecs = !isIOSDevice && typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
 
           if (hasAudioCodecs) {
             const checkConfig = async (sampleRate, withBitrate) => {
@@ -789,6 +875,7 @@ export class VideoExporter {
               try {
                 const renderedBuffer = await AudioSys.renderOfflineAudio(duration, targetSampleRate);
                 if (renderedBuffer && renderedBuffer.length > 0) {
+                  this.lastRenderedAudioBuffer = renderedBuffer;
                   let audioEncoderError = null;
 
                   const audioEncoder = new AudioEncoder({
@@ -883,10 +970,11 @@ export class VideoExporter {
 
           // Fallback if AudioEncoder is not supported (e.g. iPhone iOS Safari) or yielded 0 chunks
           if (encodedAudioChunks.length === 0) {
-            console.log('[VideoExporter] WebCodecs AudioEncoder unavailable or yielded 0 chunks, encoding via WebAssembly AAC engine...');
+            console.log('[VideoExporter] WebCodecs AudioEncoder unavailable or bypassed on iOS, encoding via WebAssembly AAC engine...');
             targetSampleRate = 44100;
             const renderedBuffer = await AudioSys.renderOfflineAudio(duration, targetSampleRate);
             if (renderedBuffer && renderedBuffer.length > 0) {
+              this.lastRenderedAudioBuffer = renderedBuffer;
               const wasmRes = await this.encodeAudioWithWasm(renderedBuffer, duration, targetSampleRate);
               if (wasmRes && wasmRes.chunks && wasmRes.chunks.length > 0) {
                 encodedAudioChunks.push(...wasmRes.chunks);
@@ -907,9 +995,13 @@ export class VideoExporter {
               numberOfChannels: 2,
               sampleRate: targetSampleRate
             };
+            this.lastExportAudioTrackConfig = audioTrackConfig;
+            this.lastExportAudioChunksCount = encodedAudioChunks.length;
             audioStatusMsg = `AAC Audio (${encodedAudioChunks.length} chunks, ${targetSampleRate}Hz)`;
             console.log(`[VideoExporter] Successfully prepared ${audioStatusMsg}`);
           } else {
+            this.lastExportAudioTrackConfig = null;
+            this.lastExportAudioChunksCount = 0;
             throw new Error('Audio was enabled but no audio packets could be produced.');
           }
         } catch (audioErr) {
@@ -917,6 +1009,9 @@ export class VideoExporter {
           throw audioErr;
         }
       } else {
+        this.lastExportAudioTrackConfig = null;
+        this.lastExportAudioChunksCount = 0;
+        this.lastRenderedAudioBuffer = null;
         audioStatusMsg = (project.audio && project.audio.muted) ? 'Muted' : 'Disabled';
       }
 

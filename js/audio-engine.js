@@ -4,9 +4,9 @@
  * waveform peak generation, and MediaStreamDestination piping for video export.
  */
 
-import { Utils } from './utils.js';
-import { State } from './state.js';
-import { Storage } from './project-storage.js';
+import { Utils } from './utils.js?v=2.3.5';
+import { State } from './state.js?v=2.3.5';
+import { Storage } from './project-storage.js?v=2.3.5';
 
 class AudioEngine {
   constructor() {

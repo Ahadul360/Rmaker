@@ -4,16 +4,16 @@
  * tool panels, keyboard shortcuts, templates, and PWA offline readiness.
  */
 
-import { Utils } from './utils.js';
-import { State } from './state.js';
-import { Storage } from './project-storage.js';
-import { Presets } from './presets.js';
-import { CanvasRenderer } from './canvas-renderer.js';
-import { AudioSys } from './audio-engine.js';
-import { Timeline } from './timeline.js';
-import { Exporter } from './video-exporter.js';
-import { TextEditor } from './text-editor.js';
-import { BackgroundEditor } from './background-editor.js';
+import { Utils } from './utils.js?v=2.3.5';
+import { State } from './state.js?v=2.3.5';
+import { Storage } from './project-storage.js?v=2.3.5';
+import { Presets } from './presets.js?v=2.3.5';
+import { CanvasRenderer } from './canvas-renderer.js?v=2.3.5';
+import { AudioSys } from './audio-engine.js?v=2.3.5';
+import { Timeline } from './timeline.js?v=2.3.5';
+import { Exporter } from './video-exporter.js?v=2.3.5';
+import { TextEditor } from './text-editor.js?v=2.3.5';
+import { BackgroundEditor } from './background-editor.js?v=2.3.5';
 
 class ReelApp {
   constructor() {
