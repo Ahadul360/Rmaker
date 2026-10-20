@@ -173,23 +173,7 @@ export class VideoExporter {
                 <span>🔊</span> <span>Sound ON</span>
               </button>
             </div>
-
-            <div class="export-audio-helper" style="margin-top: 10px; margin-bottom: 5px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; text-align: left;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px;">
-                <span style="font-size: 12px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 5px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ed573" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                  Sound Check
-                </span>
-                <button type="button" id="btn-test-exported-audio" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;">
-                  🔊 Play Sound Check
-                </button>
-              </div>
-              <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
-                <strong style="color: #ff9f43;">iPhone Notice:</strong> If your iPhone is on <em>Silent Mode</em> (Silent switch or Action Button), preview videos play muted by default. Unmute in Photos or turn off Silent Mode to hear audio.
-              </p>
-            </div>
-
-            <div class="modal-footer flex-column" style="gap: 10px;">
+            <div class="modal-footer flex-column" style="gap: 10px; margin-top: 14px;">
               <button class="btn btn-primary btn-block" id="btn-download-video">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span id="btn-download-label">Download MP4 Video</span>
@@ -276,40 +260,6 @@ export class VideoExporter {
     modal.querySelector('#btn-export-again').addEventListener('click', () => {
       this.showConfigView();
     });
-
-    const audioTestBtn = modal.querySelector('#btn-test-exported-audio');
-    if (audioTestBtn) {
-      let testSource = null;
-      audioTestBtn.addEventListener('click', async () => {
-        if (testSource) {
-          try { testSource.stop(); } catch (e) {}
-          testSource = null;
-          audioTestBtn.textContent = '🔊 Play Sound Check';
-          return;
-        }
-        if (!this.lastRenderedAudioBuffer) {
-          Utils.showToast('No audio buffer available to test', 'info');
-          return;
-        }
-        try {
-          await AudioSys.unlockAudioContext();
-          if (AudioSys.ctx && AudioSys.ctx.state === 'suspended') {
-            await AudioSys.ctx.resume();
-          }
-          testSource = AudioSys.ctx.createBufferSource();
-          testSource.buffer = this.lastRenderedAudioBuffer;
-          testSource.connect(AudioSys.ctx.destination);
-          testSource.onended = () => {
-            testSource = null;
-            audioTestBtn.textContent = '🔊 Play Sound Check';
-          };
-          testSource.start(0);
-          audioTestBtn.textContent = '⏹ Stop Sound Check';
-        } catch (err) {
-          console.warn('[VideoExporter] Audio check error:', err);
-        }
-      });
-    }
   }
 
   startPreviewAudio(fromTime = 0) {
@@ -583,12 +533,6 @@ export class VideoExporter {
     videoEl.onended = () => {
       this.stopPreviewAudio();
     };
-
-    const audioTestBtn = completeView.querySelector('#btn-test-exported-audio');
-    if (audioTestBtn) {
-      audioTestBtn.textContent = '🔊 Play Sound Check';
-      audioTestBtn.style.display = this.lastRenderedAudioBuffer ? 'inline-flex' : 'none';
-    }
 
     const audioBadge = completeView.querySelector('#export-audio-badge');
     const audioBadgeText = completeView.querySelector('#export-audio-badge-text');
